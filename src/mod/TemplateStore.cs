@@ -15,6 +15,7 @@ namespace SolarExpanseCargoTemplates
     public class CargoTemplate
     {
         public string name;
+        public bool collapsed; // editor-window fold state; persisted so it survives reopening
         public List<TemplateItem> items = new List<TemplateItem>();
     }
 

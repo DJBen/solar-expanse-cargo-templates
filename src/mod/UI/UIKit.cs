@@ -241,6 +241,50 @@ namespace SolarExpanseCargoTemplates.UI
             return btn;
         }
 
+        /// <summary>
+        /// Fold toggle drawn from two bars: chevron points right when collapsed, down when expanded.
+        /// </summary>
+        public static Button MakeChevronButton(Transform parent, bool expanded, Action onClick, float size = 30f)
+        {
+            var go = new GameObject("ChevronBtn", typeof(RectTransform));
+            go.transform.SetParent(parent, false);
+            var img = go.AddComponent<Image>();
+            img.color = new Color(1f, 1f, 1f, 0.02f); // near-invisible but raycastable
+            var btn = go.AddComponent<Button>();
+            btn.targetGraphic = img;
+            var colors = btn.colors;
+            colors.highlightedColor = new Color(1f, 1f, 1f, 0.15f);
+            btn.colors = colors;
+            btn.onClick.AddListener(() => onClick());
+            var le = go.AddComponent<LayoutElement>();
+            le.minWidth = size; le.preferredWidth = size;
+            le.minHeight = size; le.preferredHeight = size;
+
+            var glyphGO = new GameObject("Glyph", typeof(RectTransform));
+            glyphGO.transform.SetParent(go.transform, false);
+            var glyphRT = (RectTransform)glyphGO.transform;
+            glyphRT.anchorMin = glyphRT.anchorMax = new Vector2(0.5f, 0.5f);
+            glyphRT.sizeDelta = Vector2.zero;
+            glyphRT.localRotation = Quaternion.Euler(0f, 0f, expanded ? -90f : 0f);
+
+            float barLen = size * 0.38f;
+            float off = barLen * 0.32f;
+            for (int i = 0; i < 2; i++)
+            {
+                var barGO = new GameObject("Bar", typeof(RectTransform));
+                barGO.transform.SetParent(glyphGO.transform, false);
+                var barRT = (RectTransform)barGO.transform;
+                barRT.anchorMin = barRT.anchorMax = new Vector2(0.5f, 0.5f);
+                barRT.sizeDelta = new Vector2(barLen, 2.5f);
+                barRT.anchoredPosition = new Vector2(0f, i == 0 ? off : -off);
+                barRT.localRotation = Quaternion.Euler(0f, 0f, i == 0 ? -45f : 45f);
+                var barImg = barGO.AddComponent<Image>();
+                barImg.color = new Color(1f, 1f, 1f, 0.85f);
+                barImg.raycastTarget = false;
+            }
+            return btn;
+        }
+
         /// <summary>Left-aligned button with a leading sprite icon (launch-windows dropdown-item style).</summary>
         public static Button MakeIconButton(Transform parent, TMP_FontAsset font, Sprite icon, string richText,
                                             Action onClick, float height = 30f)

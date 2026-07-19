@@ -298,8 +298,18 @@ namespace SolarExpanseCargoTemplates.UI
                 int templateIndex = i;
                 var t = templates[i];
 
-                // Template header: [name input][✕]
+                // Template header: [fold chevron][name input][✕]
                 var head = UIKit.MakeRow(_scrollContent);
+                UIKit.MakeChevronButton(head.transform, expanded: !t.collapsed, () =>
+                {
+                    var list = TemplateStore.Load();
+                    if (templateIndex < list.Count)
+                    {
+                        list[templateIndex].collapsed = !list[templateIndex].collapsed;
+                        TemplateStore.Save(list);
+                    }
+                    RebuildContent();
+                });
                 UIKit.MakeInput(head.transform, Font, t.name, TMP_InputField.ContentType.Standard, 0f,
                     v =>
                     {
@@ -313,6 +323,16 @@ namespace SolarExpanseCargoTemplates.UI
                     if (templateIndex < list.Count) { list.RemoveAt(templateIndex); TemplateStore.Save(list); }
                     RebuildContent();
                 });
+
+                if (t.collapsed)
+                {
+                    // Folded: hide item rows and the add buttons; just a compact summary line.
+                    UIKit.MakeLabel(_scrollContent, Font,
+                        $"    {t.items.Count} resource{(t.items.Count == 1 ? "" : "s")}", 13f, muted: true)
+                        .GetComponent<LayoutElement>().minHeight = 20f;
+                    UIKit.MakeLabel(_scrollContent, Font, "", 6f).GetComponent<LayoutElement>().minHeight = 8f;
+                    continue;
+                }
 
                 // Item rows: [resource][mass input][✕]
                 for (int j = 0; j < t.items.Count; j++)

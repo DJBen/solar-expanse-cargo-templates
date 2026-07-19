@@ -21,7 +21,9 @@ namespace SolarExpanseCargoTemplates
             {
                 var t = templates[i];
                 if (i > 0) sb.Append(',');
-                sb.Append("\n    { \"name\": ").Append(Quote(t.name)).Append(", \"items\": [");
+                sb.Append("\n    { \"name\": ").Append(Quote(t.name))
+                  .Append(", \"collapsed\": ").Append(t.collapsed ? "true" : "false")
+                  .Append(", \"items\": [");
                 for (int j = 0; j < t.items.Count; j++)
                 {
                     var item = t.items[j];
@@ -68,7 +70,8 @@ namespace SolarExpanseCargoTemplates
                 if (!(tVal is Dictionary<string, object> tObj)) continue;
                 var template = new CargoTemplate
                 {
-                    name = tObj.TryGetValue("name", out object n) ? n as string ?? "Template" : "Template"
+                    name = tObj.TryGetValue("name", out object n) ? n as string ?? "Template" : "Template",
+                    collapsed = tObj.TryGetValue("collapsed", out object c) && c is bool cb && cb
                 };
                 if (tObj.TryGetValue("items", out object itemsVal) && itemsVal is List<object> itemsList)
                 {
