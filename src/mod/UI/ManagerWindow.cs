@@ -137,12 +137,7 @@ namespace SolarExpanseCargoTemplates.UI
 
             if (!_placed)
             {
-                // Wait for the other mod buttons to leave their -9999 staging position; after 3s
-                // give up on them and anchor to the notification button instead.
-                RectTransform refRT = FindReferenceButton();
-                if (refRT == null && Time.unscaledTime - _spawnTime > 3f) refRT = ShowBtnRT;
-                if (refRT == null) return;
-                PlaceLeftOf(refRT);
+                PlaceLeftOf(null);
                 _placed = true;
                 StoreNormalizedPos();
                 _lastCanvasSize = _canvasRT.rect.size;
@@ -162,42 +157,14 @@ namespace SolarExpanseCargoTemplates.UI
 
         void PlaceLeftOf(RectTransform refRT)
         {
-            Camera cam = Cam();
-            var corners = new Vector3[4];
-            refRT.GetWorldCorners(corners); // 1 = top-left
-            Vector2 topLeft;
-            if (!RectTransformUtility.ScreenPointToLocalPointInRectangle(
-                    _canvasRT, new Vector2(corners[1].x, corners[1].y), cam, out topLeft)) return;
-            // Nudged above the reference so the label doesn't overlay the UI below it.
-            _rt.anchoredPosition = new Vector2(topLeft.x - 6f - _rt.sizeDelta.x, topLeft.y + 40f);
+            // Fixed initial placement: top-left of the screen, 150px down (the reference-button
+            // chaining is no longer used for position — the button is draggable anyway).
+            Rect cr = _canvasRT.rect;
+            _rt.anchoredPosition = new Vector2(cr.xMin, cr.yMax - 150f);
             Clamp();
         }
 
         Camera Cam() => _canvas.renderMode == RenderMode.ScreenSpaceOverlay ? null : _canvas.worldCamera;
-
-        /// <summary>Leftmost settled mod button (ignores ones still parked offscreen).</summary>
-        RectTransform FindReferenceButton()
-        {
-            if (_canvas == null) return null;
-            RectTransform best = null;
-            float bestX = float.MaxValue;
-            foreach (RectTransform rt in _canvas.GetComponentsInChildren<RectTransform>(true))
-            {
-                if (rt == _rt) continue;
-                string n = rt.gameObject.name ?? "";
-                if ((n.Equals("modLaunchWindowsButton", StringComparison.OrdinalIgnoreCase) ||
-                     n.Equals("modPowerTrackerButton", StringComparison.OrdinalIgnoreCase) ||
-                     n.Equals("modLifeSupportButton", StringComparison.OrdinalIgnoreCase) ||
-                     n.Equals("modFleetTrackerButton", StringComparison.OrdinalIgnoreCase)) &&
-                    rt.GetComponent<Image>() != null)
-                {
-                    var pos = rt.anchoredPosition;
-                    if (pos.x < -4000f || pos.y < -4000f) continue;
-                    if (best == null || pos.x < bestX) { best = rt; bestX = pos.x; }
-                }
-            }
-            return best;
-        }
 
         // ── Drag (independent of the other mod buttons) ─────────────────────────────────────
 
