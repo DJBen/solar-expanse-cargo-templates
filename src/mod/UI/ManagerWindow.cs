@@ -117,7 +117,8 @@ namespace SolarExpanseCargoTemplates.UI
 
         GameObject _panelGO;
         Transform _scrollContent;
-        int _pickingForIndex = -1; // template index whose "+ ADD RESOURCE" opened the picker
+        int _pickingForIndex = -1;     // template index whose add-picker is open
+        bool _pickingBuildings;        // false = resource picker, true = building-cost picker
 
         void Awake()
         {
@@ -254,6 +255,7 @@ namespace SolarExpanseCargoTemplates.UI
             if (_panelGO != null) { Destroy(_panelGO); _panelGO = null; }
             _scrollContent = null;
             _pickingForIndex = -1;
+            _pickingBuildings = false;
         }
 
         /// <summary>
@@ -293,7 +295,7 @@ namespace SolarExpanseCargoTemplates.UI
                 TemplateStore.Save(list);
                 RebuildContent();
             }, fixedWidth: 80f, bgColor: UIKit.Accent);
-            UIKit.MakeButton(header.transform, Font, "×", ClosePanel, fixedWidth: 30f);
+            UIKit.MakeCrossButton(header.transform, ClosePanel, bgColor: UIKit.BtnBg);
 
             _scrollContent = UIKit.MakeScroll(_panelGO.transform, 430f);
             RebuildContent();
@@ -313,7 +315,12 @@ namespace SolarExpanseCargoTemplates.UI
             if (_scrollContent == null) return;
             UIKit.ClearChildren(_scrollContent);
 
-            if (_pickingForIndex >= 0) { BuildResourcePicker(); return; }
+            if (_pickingForIndex >= 0)
+            {
+                if (_pickingBuildings) BuildBuildingPicker();
+                else BuildResourcePicker();
+                return;
+            }
 
             var templates = TemplateStore.Load();
             if (templates.Count == 0)
@@ -333,12 +340,12 @@ namespace SolarExpanseCargoTemplates.UI
                         if (templateIndex < list.Count && !string.IsNullOrEmpty(v))
                         { list[templateIndex].name = v; TemplateStore.Save(list); }
                     }, expandWidth: true);
-                UIKit.MakeButton(head.transform, Font, "✕", () =>
+                UIKit.MakeCrossButton(head.transform, () =>
                 {
                     var list = TemplateStore.Load();
                     if (templateIndex < list.Count) { list.RemoveAt(templateIndex); TemplateStore.Save(list); }
                     RebuildContent();
-                }, fixedWidth: 30f, bgColor: UIKit.Danger);
+                });
 
                 // Item rows: [resource][mass input][✕]
                 for (int j = 0; j < t.items.Count; j++)
@@ -360,23 +367,65 @@ namespace SolarExpanseCargoTemplates.UI
                             { list[templateIndex].items[itemIndex].mass = Math.Max(0, mass); TemplateStore.Save(list); }
                         });
                     UIKit.MakeLabel(row.transform, Font, "t", fixedWidth: 14f, muted: true);
-                    UIKit.MakeButton(row.transform, Font, "✕", () =>
+                    UIKit.MakeCrossButton(row.transform, () =>
                     {
                         var list = TemplateStore.Load();
                         if (templateIndex < list.Count && itemIndex < list[templateIndex].items.Count)
                         { list[templateIndex].items.RemoveAt(itemIndex); TemplateStore.Save(list); }
                         RebuildContent();
-                    }, fixedWidth: 30f);
+                    }, bgColor: UIKit.BtnBg);
                 }
 
-                UIKit.MakeButton(_scrollContent, Font, "+ ADD RESOURCE", () =>
+                var addRow = UIKit.MakeRow(_scrollContent);
+                UIKit.MakeButton(addRow.transform, Font, "+ ADD RESOURCE", () =>
                 {
                     _pickingForIndex = templateIndex;
+                    _pickingBuildings = false;
+                    RebuildContent();
+                }, expandWidth: true, height: 26f, bgColor: new Color(0.10f, 0.14f, 0.20f, 0.9f));
+                UIKit.MakeButton(addRow.transform, Font, "+ FROM BUILDING COST", () =>
+                {
+                    _pickingForIndex = templateIndex;
+                    _pickingBuildings = true;
                     RebuildContent();
                 }, expandWidth: true, height: 26f, bgColor: new Color(0.10f, 0.14f, 0.20f, 0.9f));
 
                 // Spacer between templates
                 UIKit.MakeLabel(_scrollContent, Font, "", 6f).GetComponent<LayoutElement>().minHeight = 8f;
+            }
+        }
+
+        /// <summary>Picker of constructible buildings; choosing one merges its resource cost into the template.</summary>
+        void BuildBuildingPicker()
+        {
+            UIKit.MakeButton(_scrollContent, Font, "← BACK", () =>
+            {
+                _pickingForIndex = -1;
+                _pickingBuildings = false;
+                RebuildContent();
+            }, expandWidth: true, bgColor: UIKit.BtnBg);
+
+            var buildings = TemplateService.AvailableBuildings();
+            if (buildings.Count == 0)
+                UIKit.MakeLabel(_scrollContent, Font, "No constructible buildings found.", muted: true);
+
+            foreach (var f in buildings)
+            {
+                var captured = f;
+                string label = $"{TemplateService.ResourceName(captured.ID)}  " +
+                               $"<color=#8A8A8A>{TemplateService.SummarizePrice(captured)}</color>";
+                UIKit.MakeIconButton(_scrollContent, Font, captured.Sprite, label, () =>
+                {
+                    var list = TemplateStore.Load();
+                    if (_pickingForIndex >= 0 && _pickingForIndex < list.Count)
+                    {
+                        TemplateService.AddBuildingCost(list[_pickingForIndex], captured);
+                        TemplateStore.Save(list);
+                    }
+                    _pickingForIndex = -1;
+                    _pickingBuildings = false;
+                    RebuildContent();
+                });
             }
         }
 

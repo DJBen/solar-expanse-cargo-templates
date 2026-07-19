@@ -26,6 +26,54 @@ namespace SolarExpanseCargoTemplates
             return all != null ? all.AllResourceDefinitions.GetByID(id) : null;
         }
 
+        /// <summary>
+        /// Buildings the player can currently construct (unlocked, not locked/obsolete) that have
+        /// a resource cost — the "add from building cost" picker list.
+        /// </summary>
+        public static List<Data.ScriptableObject.FacilityBaseDescriptor> AvailableBuildings()
+        {
+            var result = new List<Data.ScriptableObject.FacilityBaseDescriptor>();
+            var all = SerializedMonoBehaviourSingleton<AllScriptableObjectManager>.Instance;
+            if (all == null || all.AllFacility == null) return result;
+            var player = MonoBehaviourSingleton<GameManager>.Instance != null
+                ? MonoBehaviourSingleton<GameManager>.Instance.Player : null;
+            foreach (var f in all.AllFacility.ListNotEmpty)
+            {
+                if (f == null || f.IsLocked) continue;
+                if (player != null && !player.IsUnlockFacility(f)) continue;
+                if (f.Price == null || f.Price.ListResources == null || f.Price.ListResources.Count == 0) continue;
+                result.Add(f);
+            }
+            return result;
+        }
+
+        /// <summary>"Metal 120t · Water 30t" for a building's construction cost.</summary>
+        public static string SummarizePrice(Data.ScriptableObject.FacilityBaseDescriptor f)
+        {
+            var parts = new List<string>();
+            foreach (var one in f.Price.ListResources)
+            {
+                var rd = one.ResourceDefinition;
+                if (rd == null) continue;
+                parts.Add($"{ResourceName(rd.ID)} {one.Price:0.#}t");
+            }
+            return string.Join(" · ", parts);
+        }
+
+        /// <summary>Merge a building's resource cost into a template (summing same-resource items).</summary>
+        public static void AddBuildingCost(CargoTemplate t, Data.ScriptableObject.FacilityBaseDescriptor f)
+        {
+            foreach (var one in f.Price.ListResources)
+            {
+                var rd = one.ResourceDefinition;
+                if (rd == null || one.Price <= 0) continue;
+                string id = rd.ID;
+                var existing = t.items.Find(x => x.id == id);
+                if (existing != null) existing.mass = Math.Round(existing.mass + one.Price, 2);
+                else t.items.Add(new TemplateItem { id = id, mass = Math.Round(one.Price, 2) });
+            }
+        }
+
         /// <summary>All resources the game allows as cargo — the manager window's picker list.</summary>
         public static List<ResourceDefinition> AllCargoResources()
         {

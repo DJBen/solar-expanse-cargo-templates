@@ -15,6 +15,7 @@ namespace SolarExpanseCargoTemplates.UI
         public static readonly Color Accent = new Color(0.10f, 0.22f, 0.14f, 0.9f);
         public static readonly Color Danger = new Color(0.30f, 0.10f, 0.10f, 0.9f);
         public static readonly Color InputBg = new Color(0.05f, 0.06f, 0.07f, 0.95f);
+        public static readonly Color InputFocusBg = new Color(0.13f, 0.22f, 0.33f, 1f);
 
         static TMP_FontAsset headerFont;
         static bool headerFontSearched;
@@ -175,8 +176,102 @@ namespace SolarExpanseCargoTemplates.UI
             input.textComponent = tmp;
             input.contentType = contentType;
             input.text = initial;
+            // Make the focused state unmistakable: brighter field + visible caret/selection.
+            input.customCaretColor = true;
+            input.caretColor = Color.white;
+            input.caretWidth = 2;
+            input.selectionColor = new Color(0.25f, 0.45f, 0.65f, 0.65f);
+            input.onSelect.AddListener(_ => img.color = InputFocusBg);
+            input.onDeselect.AddListener(_ => img.color = InputBg);
             if (onEndEdit != null) input.onEndEdit.AddListener(v => onEndEdit(v));
             return input;
+        }
+
+        /// <summary>Delete button with an explicit drawn ✕ (two rotated bars — no font glyph needed).</summary>
+        public static Button MakeCrossButton(Transform parent, Action onClick, float size = 30f, Color? bgColor = null)
+        {
+            var go = new GameObject("CrossBtn", typeof(RectTransform));
+            go.transform.SetParent(parent, false);
+            var img = go.AddComponent<Image>();
+            img.color = bgColor ?? Danger;
+            var btn = go.AddComponent<Button>();
+            btn.targetGraphic = img;
+            var colors = btn.colors;
+            colors.highlightedColor = new Color(0.45f, 0.16f, 0.16f, 1f);
+            btn.colors = colors;
+            btn.onClick.AddListener(() => onClick());
+            var le = go.AddComponent<LayoutElement>();
+            le.minWidth = size; le.preferredWidth = size;
+            le.minHeight = size; le.preferredHeight = size;
+
+            for (int i = 0; i < 2; i++)
+            {
+                var barGO = new GameObject("Bar", typeof(RectTransform));
+                barGO.transform.SetParent(go.transform, false);
+                var barRT = (RectTransform)barGO.transform;
+                barRT.anchorMin = barRT.anchorMax = new Vector2(0.5f, 0.5f);
+                barRT.sizeDelta = new Vector2(size * 0.45f, 2.5f);
+                barRT.localRotation = Quaternion.Euler(0f, 0f, i == 0 ? 45f : -45f);
+                var barImg = barGO.AddComponent<Image>();
+                barImg.color = new Color(1f, 1f, 1f, 0.9f);
+                barImg.raycastTarget = false;
+            }
+            return btn;
+        }
+
+        /// <summary>Left-aligned button with a leading sprite icon (launch-windows dropdown-item style).</summary>
+        public static Button MakeIconButton(Transform parent, TMP_FontAsset font, Sprite icon, string richText,
+                                            Action onClick, float height = 30f)
+        {
+            var go = new GameObject("IconBtn", typeof(RectTransform));
+            go.transform.SetParent(parent, false);
+            var img = go.AddComponent<Image>();
+            img.color = BtnBg;
+            var btn = go.AddComponent<Button>();
+            btn.targetGraphic = img;
+            var colors = btn.colors;
+            colors.highlightedColor = BtnHover;
+            btn.colors = colors;
+            btn.onClick.AddListener(() => onClick());
+            var le = go.AddComponent<LayoutElement>();
+            le.minHeight = height;
+            le.preferredHeight = height;
+            le.flexibleWidth = 1f;
+
+            bool hasIcon = icon != null;
+            if (hasIcon)
+            {
+                var icoGO = new GameObject("Ico", typeof(RectTransform));
+                icoGO.transform.SetParent(go.transform, false);
+                var icoRT = (RectTransform)icoGO.transform;
+                icoRT.anchorMin = new Vector2(0f, 0f);
+                icoRT.anchorMax = new Vector2(0f, 1f);
+                icoRT.pivot = new Vector2(0f, 0.5f);
+                icoRT.sizeDelta = new Vector2(22f, -8f);
+                icoRT.anchoredPosition = new Vector2(6f, 0f);
+                var icoImg = icoGO.AddComponent<Image>();
+                icoImg.sprite = icon;
+                icoImg.preserveAspect = true;
+                icoImg.raycastTarget = false;
+            }
+
+            var lblGO = new GameObject("L", typeof(RectTransform));
+            lblGO.transform.SetParent(go.transform, false);
+            var lblRT = (RectTransform)lblGO.transform;
+            lblRT.anchorMin = Vector2.zero;
+            lblRT.anchorMax = Vector2.one;
+            lblRT.offsetMin = new Vector2(hasIcon ? 34f : 8f, 0f);
+            lblRT.offsetMax = new Vector2(-8f, 0f);
+            var tmp = lblGO.AddComponent<TextMeshProUGUI>();
+            if (font != null) tmp.font = font;
+            tmp.text = richText;
+            tmp.fontSize = 15f;
+            tmp.color = Color.white;
+            tmp.alignment = TextAlignmentOptions.Left;
+            tmp.enableWordWrapping = false;
+            tmp.overflowMode = TextOverflowModes.Ellipsis;
+            tmp.raycastTarget = false;
+            return btn;
         }
 
         /// <summary>Vertical ScrollRect (mouse-wheel scrollable); returns the content Transform.</summary>
