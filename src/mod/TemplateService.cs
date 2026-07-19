@@ -121,8 +121,9 @@ namespace SolarExpanseCargoTemplates
         }
 
         /// <summary>
-        /// Rich-text summary of a template at a given multiplier. Items whose required amount
-        /// exceeds the origin's stock (or whose resource is unknown) are rendered red.
+        /// Rich-text "[icon] 100t · [icon] 10t" summary of a template at a given multiplier.
+        /// Items whose required amount exceeds the origin's stock (or whose resource is unknown)
+        /// have their amount rendered red. Meant for a wrapping multi-line label.
         /// </summary>
         public static string SummarizeForOrigin(PMTabCargo tab, CargoTemplate t, int multiplier)
         {
@@ -132,10 +133,13 @@ namespace SolarExpanseCargoTemplates
                 double needed = item.mass * multiplier;
                 ResourceDefinition rd = GetResource(item.id);
                 bool short_ = rd == null || AvailableAtOrigin(tab, rd) + 1e-9 < needed;
-                string text = $"{ResourceName(item.id)} {needed:0.##}t";
-                parts.Add(short_ ? $"<color={RedHex}>{text}</color>" : text);
+                string icon;
+                try { icon = rd != null ? rd.IconString + " " : ""; } catch { icon = ""; }
+                string amount = $"{needed:0.##}t";
+                // The sprite ignores the color tag; the amount text carries the red signal.
+                parts.Add(icon + (short_ ? $"<color={RedHex}>{amount}</color>" : amount));
             }
-            return string.Join(" · ", parts);
+            return string.Join("  ·  ", parts);
         }
 
         public static string Summarize(CargoTemplate t)

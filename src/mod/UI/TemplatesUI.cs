@@ -55,7 +55,8 @@ namespace SolarExpanseCargoTemplates.UI
                 var label = clone.GetComponentInChildren<TextMeshProUGUI>(true);
                 if (label != null)
                 {
-                    label.text = "TEMPLATES ▾";
+                    // No dropdown-arrow glyph: the game's font lacks ▾ and renders a tofu box.
+                    label.text = "TEMPLATES";
                     label.enableAutoSizing = false;
                 }
             }
@@ -121,23 +122,65 @@ namespace SolarExpanseCargoTemplates.UI
                 int multiplier = 1;
 
                 var row = UIKit.MakeRow(panelGO.transform);
-                TextMeshProUGUI applyLabel;
-                UIKit.MakeButton(row.transform, font,
-                    RowText(captured, 1),
-                    () =>
-                    {
-                        TemplateService.Apply(currentTab, captured, multiplier);
-                        HidePanel();
-                    }, out applyLabel, expandWidth: true, alignLeft: true);
+                row.GetComponent<HorizontalLayoutGroup>().childAlignment = TextAnchor.UpperLeft;
 
+                // ── Apply block: name on the first line, wrapping icon+amount list below ──────
+                var blockGO = new GameObject("TplBtn", typeof(RectTransform));
+                blockGO.transform.SetParent(row.transform, false);
+                var img = blockGO.AddComponent<Image>();
+                img.color = UIKit.BtnBg;
+                var btn = blockGO.AddComponent<Button>();
+                btn.targetGraphic = img;
+                var colors = btn.colors;
+                colors.highlightedColor = UIKit.BtnHover;
+                btn.colors = colors;
+                btn.onClick.AddListener(() =>
+                {
+                    TemplateService.Apply(currentTab, captured, multiplier);
+                    HidePanel();
+                });
+                blockGO.AddComponent<LayoutElement>().flexibleWidth = 1f;
+                var blockVlg = blockGO.AddComponent<VerticalLayoutGroup>();
+                blockVlg.padding = new RectOffset(8, 8, 4, 6);
+                blockVlg.spacing = 2f;
+                blockVlg.childForceExpandWidth = true;
+                blockVlg.childForceExpandHeight = false;
+                blockVlg.childControlWidth = true;
+                blockVlg.childControlHeight = true;
+
+                var nameTmp = MakeBlockLabel(blockGO.transform, font, $"<b>{captured.name}</b>", wrap: false);
+                nameTmp.raycastTarget = false;
+                var detailTmp = MakeBlockLabel(blockGO.transform, font,
+                    TemplateService.SummarizeForOrigin(currentTab, captured, 1), wrap: true);
+                detailTmp.fontSize = 14f;
+                detailTmp.raycastTarget = false;
+
+                // ── Multiplier (top-aligned, on the name line) ────────────────────────────────
                 UIKit.MakeLabel(row.transform, font, "×", fixedWidth: 14f, muted: true);
                 UIKit.MakeInput(row.transform, font, "1", TMP_InputField.ContentType.IntegerNumber, 46f,
                     v =>
                     {
                         multiplier = ParseMultiplier(v);
-                        if (applyLabel != null) applyLabel.text = RowText(captured, multiplier);
+                        if (detailTmp != null)
+                            detailTmp.text = TemplateService.SummarizeForOrigin(currentTab, captured, multiplier);
                     });
             }
+        }
+
+        /// <summary>Layout-driven TMP line inside the apply block; wrapping lines auto-expand.</summary>
+        static TextMeshProUGUI MakeBlockLabel(Transform parent, TMP_FontAsset font, string text, bool wrap)
+        {
+            var go = new GameObject("Line", typeof(RectTransform));
+            go.transform.SetParent(parent, false);
+            var tmp = go.AddComponent<TextMeshProUGUI>();
+            if (font != null) tmp.font = font;
+            tmp.text = text;
+            tmp.fontSize = 16f;
+            tmp.color = Color.white;
+            tmp.alignment = TextAlignmentOptions.TopLeft;
+            tmp.enableWordWrapping = wrap;
+            tmp.overflowMode = TextOverflowModes.Overflow;
+            return tmp;
         }
 
         static int ParseMultiplier(string v)
@@ -145,8 +188,5 @@ namespace SolarExpanseCargoTemplates.UI
             if (!int.TryParse(v, out int m) || m < 1) m = 1;
             return m;
         }
-
-        static string RowText(CargoTemplate t, int multiplier)
-            => $"<b>{t.name}</b>  —  {TemplateService.SummarizeForOrigin(currentTab, t, multiplier)}";
     }
 }
