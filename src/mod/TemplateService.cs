@@ -229,13 +229,37 @@ namespace SolarExpanseCargoTemplates
                 }
                 try
                 {
+                    double want = item.mass * multiplier;
+
+                    // Merge into an existing row of the same resource: a duplicate row would make
+                    // the game's ChangeCargoToMaxOnPlanet re-clamp the per-planet total and zero
+                    // out the earlier row.
+                    Cargo existing = cargoAll.listCargo.Find(c =>
+                        c != null && !c.IsCargoFuelSpecial &&
+                        c.resourceTypeType == EResourceTypeType.resorces && c.resourceType == rd);
+                    if (existing != null)
+                    {
+                        double othersSame = 0;
+                        foreach (var c in cargoAll.listCargo)
+                            if (c != null && c != existing && c.resourceType == rd) othersSame += c.cargoMass;
+                        foreach (var c in cargoAll.listCargoToOrbit)
+                            if (c != null && c.resourceType == rd) othersSame += c.cargoMass;
+
+                        double target = existing.cargoMass + want;
+                        double stock = AvailableAtOrigin(tab, rd);
+                        target = Math.Min(target, Math.Max(stock - othersSame, existing.cargoMass));
+                        target = Math.Min(target, existing.cargoMass + Math.Max(cargoAll.FreeSpace, 0));
+                        existing.cargoMass = Math.Round(Math.Max(existing.cargoMass, target), 2);
+                        continue;
+                    }
+
                     int before = cargoAll.listCargo.Count;
                     tab.AddCargo(rd); // game clamps mass to availability + capacity
                     if (cargoAll.listCargo.Count > before)
                     {
                         Cargo added = cargoAll.listCargo[cargoAll.listCargo.Count - 1];
                         if (added.resourceType == rd)
-                            added.cargoMass = Math.Min(item.mass * multiplier, added.cargoMass);
+                            added.cargoMass = Math.Min(want, added.cargoMass);
                     }
                 }
                 catch (Exception e)
