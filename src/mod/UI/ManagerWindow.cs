@@ -116,6 +116,7 @@ namespace SolarExpanseCargoTemplates.UI
         Vector2 _dragStartScreen;
 
         GameObject _panelGO;
+        GameObject _optionsGO;
         Transform _scrollContent;
         enum PickerKind { Resources, Buildings, Craft }
 
@@ -225,6 +226,7 @@ namespace SolarExpanseCargoTemplates.UI
         internal void ClosePanel()
         {
             if (_panelGO != null) { Destroy(_panelGO); _panelGO = null; }
+            _optionsGO = null; // child of the panel — destroyed with it
             _scrollContent = null;
             _pickerList = null;
             _pickingForIndex = -1;
@@ -259,6 +261,7 @@ namespace SolarExpanseCargoTemplates.UI
             var title = UIKit.MakeLabel(header.transform, UIKit.HeaderFont(Font), "CARGO TEMPLATES", 15f,
                 muted: false, expandWidth: true);
             title.fontStyle = TMPro.FontStyles.Bold;
+            UIKit.MakeButton(header.transform, Font, "OPTIONS", ToggleOptionsDropdown, fixedWidth: 100f);
             UIKit.MakeButton(header.transform, Font, "+ NEW", () =>
             {
                 Plugin.Log.LogInfo("[CT] + NEW clicked");
@@ -272,6 +275,29 @@ namespace SolarExpanseCargoTemplates.UI
             _scrollContent = UIKit.MakeScroll(_panelGO.transform, 430f);
             RebuildContent();
             PositionPanel();
+        }
+
+        void ToggleOptionsDropdown()
+        {
+            if (_optionsGO != null) { Destroy(_optionsGO); _optionsGO = null; return; }
+            if (_panelGO == null) return;
+
+            _optionsGO = UIKit.MakeVPanel("CTOptionsDropdown", _panelGO.transform, 300f, fitHeight: true);
+            _optionsGO.AddComponent<LayoutElement>().ignoreLayout = true; // float over the panel's VLG
+            var rt = (RectTransform)_optionsGO.transform;
+            rt.anchorMin = rt.anchorMax = new Vector2(0f, 1f);
+            rt.pivot = new Vector2(0f, 1f);
+            rt.anchoredPosition = new Vector2(9f, -42f); // just below the header row
+            _optionsGO.transform.SetAsLastSibling();     // above the scroll content
+
+            TextMeshProUGUI lbl = null;
+            string Caption() => (Plugin.CfgShowUnresearched.Value ? "[X] " : "[  ] ") + "Show Unresearched";
+            UIKit.MakeButton(_optionsGO.transform, Font, Caption(), () =>
+            {
+                Plugin.CfgShowUnresearched.Value = !Plugin.CfgShowUnresearched.Value;
+                if (lbl != null) lbl.text = Caption();
+                if (_pickingForIndex >= 0) PopulatePickerList(); // refresh an open picker live
+            }, out lbl, expandWidth: true, alignLeft: true);
         }
 
         static string NextName(List<CargoTemplate> existing)
@@ -438,7 +464,9 @@ namespace SolarExpanseCargoTemplates.UI
                     string name = TemplateService.ResourceName(captured.ID);
                     if (!Matches(name)) continue;
                     shown++;
-                    string label = $"{name}  <color=#8A8A8A>{TemplateService.SummarizePrice(captured)}</color>";
+                    string marker = TemplateService.IsBuildingUnlocked(captured)
+                        ? "" : " <color=#C9A15A>(unresearched)</color>";
+                    string label = $"{name}{marker}  <color=#8A8A8A>{TemplateService.SummarizePrice(captured)}</color>";
                     UIKit.MakeIconButton(_pickerList, Font, captured.Sprite, label, () =>
                     {
                         var list = TemplateStore.Load();
@@ -464,7 +492,8 @@ namespace SolarExpanseCargoTemplates.UI
                     string name = TemplateService.ResourceName(captured.id);
                     if (!Matches(name)) continue;
                     shown++;
-                    string label = $"{name}  <color=#8A8A8A>{TemplateService.SummarizePrice(captured.price)}</color>";
+                    string marker = captured.locked ? " <color=#C9A15A>(unresearched)</color>" : "";
+                    string label = $"{name}{marker}  <color=#8A8A8A>{TemplateService.SummarizePrice(captured.price)}</color>";
                     UIKit.MakeIconButton(_pickerList, Font, captured.sprite, label, () =>
                     {
                         var list = TemplateStore.Load();

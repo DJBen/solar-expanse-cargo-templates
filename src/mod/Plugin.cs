@@ -1,4 +1,5 @@
 using BepInEx;
+using BepInEx.Configuration;
 using HarmonyLib;
 
 namespace SolarExpanseCargoTemplates
@@ -8,9 +9,13 @@ namespace SolarExpanseCargoTemplates
     {
         internal static BepInEx.Logging.ManualLogSource Log { get; private set; }
 
+        internal static ConfigEntry<bool> CfgShowUnresearched;
+
         void Awake()
         {
             Log = base.Logger;
+            CfgShowUnresearched = Config.Bind("UI", "ShowUnresearched", false,
+                "Include unresearched buildings, spacecraft and launch vehicles in the cost pickers.");
             Log.LogInfo("Solar Expanse Cargo Templates loaded");
             new Harmony("com.djben.solar-expanse-cargo-templates").PatchAll();
         }

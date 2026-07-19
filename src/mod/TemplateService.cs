@@ -42,7 +42,7 @@ namespace SolarExpanseCargoTemplates
                 if (f == null) continue;
                 // IsLocked only means "research-gated" — IsUnlockFacility already returns true
                 // for both never-locked facilities and ones the player has since unlocked.
-                if (player != null && !player.IsUnlockFacility(f)) continue;
+                if (player != null && !player.IsUnlockFacility(f) && !ShowUnresearched) continue;
                 if (f.Price == null || f.Price.ListResources == null || f.Price.ListResources.Count == 0) continue;
                 result.Add(f);
             }
@@ -55,6 +55,18 @@ namespace SolarExpanseCargoTemplates
             public string id;
             public UnityEngine.Sprite sprite;
             public Game.UI.Windows.Elements.SpaceCraftConstructElements.ResourcePrice price;
+            public bool locked; // not yet researched by the player
+        }
+
+        static Game.Company Player => MonoBehaviourSingleton<GameManager>.Instance != null
+            ? MonoBehaviourSingleton<GameManager>.Instance.Player : null;
+
+        static bool ShowUnresearched => Plugin.CfgShowUnresearched != null && Plugin.CfgShowUnresearched.Value;
+
+        public static bool IsBuildingUnlocked(Data.ScriptableObject.FacilityBaseDescriptor f)
+        {
+            var player = Player;
+            return player == null || player.IsUnlockFacility(f);
         }
 
         /// <summary>Unlocked spacecraft + launch vehicles that have a resource cost.</summary>
@@ -71,10 +83,11 @@ namespace SolarExpanseCargoTemplates
                 foreach (var sc in all.AllSpacecraftType.ListNotEmpty)
                 {
                     if (sc == null) continue;
-                    if (player != null && !player.IsUnlockSpacecraftType(sc)) continue;
+                    bool locked = player != null && !player.IsUnlockSpacecraftType(sc);
+                    if (locked && !ShowUnresearched) continue;
                     var price = sc.PriceBase;
                     if (price == null || price.ListResources == null || price.ListResources.Count == 0) continue;
-                    result.Add(new CraftCost { id = sc.ID, sprite = sc.RocketBackGround, price = price });
+                    result.Add(new CraftCost { id = sc.ID, sprite = sc.RocketBackGround, price = price, locked = locked });
                 }
             }
             if (all.AllLaunchVehicleType != null)
@@ -82,10 +95,11 @@ namespace SolarExpanseCargoTemplates
                 foreach (var lv in all.AllLaunchVehicleType.ListNotEmpty)
                 {
                     if (lv == null) continue;
-                    if (player != null && !player.IsUnlockRocketType(lv)) continue;
+                    bool locked = player != null && !player.IsUnlockRocketType(lv);
+                    if (locked && !ShowUnresearched) continue;
                     var price = lv.PriceBase;
                     if (price == null || price.ListResources == null || price.ListResources.Count == 0) continue;
-                    result.Add(new CraftCost { id = lv.ID, sprite = lv.rocketBackGround, price = price });
+                    result.Add(new CraftCost { id = lv.ID, sprite = lv.rocketBackGround, price = price, locked = locked });
                 }
             }
             return result;
