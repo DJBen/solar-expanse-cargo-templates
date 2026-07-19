@@ -157,13 +157,15 @@ namespace SolarExpanseCargoTemplates.UI
 
                 // ── Multiplier (top-aligned, on the name line) ────────────────────────────────
                 UIKit.MakeLabel(row.transform, font, "×", fixedWidth: 14f, muted: true);
-                UIKit.MakeInput(row.transform, font, "1", TMP_InputField.ContentType.IntegerNumber, 46f,
-                    v =>
-                    {
-                        multiplier = ParseMultiplier(v);
-                        if (detailTmp != null)
-                            detailTmp.text = TemplateService.SummarizeForOrigin(currentTab, captured, multiplier);
-                    });
+                var multInput = UIKit.MakeInput(row.transform, font, "1",
+                    TMP_InputField.ContentType.IntegerNumber, 46f, null);
+                // Live update on every keystroke, not just on defocus.
+                multInput.onValueChanged.AddListener(v =>
+                {
+                    multiplier = ParseMultiplier(v);
+                    if (detailTmp != null)
+                        detailTmp.text = TemplateService.SummarizeForOrigin(currentTab, captured, multiplier);
+                });
             }
         }
 

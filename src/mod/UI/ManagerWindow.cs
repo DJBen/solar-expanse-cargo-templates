@@ -158,10 +158,10 @@ namespace SolarExpanseCargoTemplates.UI
 
         void PlaceLeftOf(RectTransform refRT)
         {
-            // Fixed initial placement: top-left of the screen, 150px down (the reference-button
-            // chaining is no longer used for position — the button is draggable anyway).
+            // Fixed initial placement: top-left of the screen. 126 canvas units ≈ 84 screen px at
+            // the observed canvas scale (150 units rendered as ~100px).
             Rect cr = _canvasRT.rect;
-            _rt.anchoredPosition = new Vector2(cr.xMin, cr.yMax - 150f);
+            _rt.anchoredPosition = new Vector2(cr.xMin, cr.yMax - 126f);
             Clamp();
         }
 

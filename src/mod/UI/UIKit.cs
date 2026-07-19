@@ -168,7 +168,7 @@ namespace SolarExpanseCargoTemplates.UI
             if (font != null) tmp.font = font;
             tmp.fontSize = 16f;
             tmp.color = Color.white;
-            tmp.alignment = TextAlignmentOptions.Left;
+            tmp.alignment = TextAlignmentOptions.MidlineLeft;
             tmp.enableWordWrapping = false;
 
             TextMeshProUGUI placeholderTmp = null;
@@ -183,11 +183,12 @@ namespace SolarExpanseCargoTemplates.UI
                 phRT.offsetMax = Vector2.zero;
                 placeholderTmp = phGO.AddComponent<TextMeshProUGUI>();
                 if (font != null) placeholderTmp.font = font;
-                placeholderTmp.fontSize = 16f;
+                placeholderTmp.fontSize = 14f; // a notch smaller than the input text so italic descenders don't clip
                 placeholderTmp.fontStyle = FontStyles.Italic;
                 placeholderTmp.color = new Color(0.6f, 0.6f, 0.6f, 0.75f);
                 placeholderTmp.text = placeholder;
                 placeholderTmp.enableWordWrapping = false;
+                placeholderTmp.alignment = TextAlignmentOptions.MidlineLeft;
             }
 
             var input = go.AddComponent<TMP_InputField>();
