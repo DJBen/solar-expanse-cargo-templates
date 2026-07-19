@@ -49,11 +49,53 @@ namespace SolarExpanseCargoTemplates
             return result;
         }
 
-        /// <summary>"[icon] 120t · [icon] 30t" for a building's construction cost.</summary>
-        public static string SummarizePrice(Data.ScriptableObject.FacilityBaseDescriptor f)
+        /// <summary>An unlocked spacecraft or launch vehicle with its construction cost.</summary>
+        public class CraftCost
+        {
+            public string id;
+            public UnityEngine.Sprite sprite;
+            public Game.UI.Windows.Elements.SpaceCraftConstructElements.ResourcePrice price;
+        }
+
+        /// <summary>Unlocked spacecraft + launch vehicles that have a resource cost.</summary>
+        public static List<CraftCost> AvailableCraft()
+        {
+            var result = new List<CraftCost>();
+            var all = SerializedMonoBehaviourSingleton<AllScriptableObjectManager>.Instance;
+            if (all == null) return result;
+            var player = MonoBehaviourSingleton<GameManager>.Instance != null
+                ? MonoBehaviourSingleton<GameManager>.Instance.Player : null;
+
+            if (all.AllSpacecraftType != null)
+            {
+                foreach (var sc in all.AllSpacecraftType.ListNotEmpty)
+                {
+                    if (sc == null) continue;
+                    if (player != null && !player.IsUnlockSpacecraftType(sc)) continue;
+                    var price = sc.PriceBase;
+                    if (price == null || price.ListResources == null || price.ListResources.Count == 0) continue;
+                    result.Add(new CraftCost { id = sc.ID, sprite = sc.RocketBackGround, price = price });
+                }
+            }
+            if (all.AllLaunchVehicleType != null)
+            {
+                foreach (var lv in all.AllLaunchVehicleType.ListNotEmpty)
+                {
+                    if (lv == null) continue;
+                    if (player != null && !player.IsUnlockRocketType(lv)) continue;
+                    var price = lv.PriceBase;
+                    if (price == null || price.ListResources == null || price.ListResources.Count == 0) continue;
+                    result.Add(new CraftCost { id = lv.ID, sprite = lv.rocketBackGround, price = price });
+                }
+            }
+            return result;
+        }
+
+        /// <summary>"[icon] 120t · [icon] 30t" for a construction cost.</summary>
+        public static string SummarizePrice(Game.UI.Windows.Elements.SpaceCraftConstructElements.ResourcePrice price)
         {
             var parts = new List<string>();
-            foreach (var one in f.Price.ListResources)
+            foreach (var one in price.ListResources)
             {
                 var rd = one.ResourceDefinition;
                 if (rd == null) continue;
@@ -64,10 +106,13 @@ namespace SolarExpanseCargoTemplates
             return string.Join(" · ", parts);
         }
 
-        /// <summary>Merge a building's resource cost into a template (summing same-resource items).</summary>
-        public static void AddBuildingCost(CargoTemplate t, Data.ScriptableObject.FacilityBaseDescriptor f)
+        public static string SummarizePrice(Data.ScriptableObject.FacilityBaseDescriptor f)
+            => SummarizePrice(f.Price);
+
+        /// <summary>Merge a construction cost into a template (summing same-resource items).</summary>
+        public static void AddCost(CargoTemplate t, Game.UI.Windows.Elements.SpaceCraftConstructElements.ResourcePrice price)
         {
-            foreach (var one in f.Price.ListResources)
+            foreach (var one in price.ListResources)
             {
                 var rd = one.ResourceDefinition;
                 if (rd == null || one.Price <= 0) continue;
@@ -77,6 +122,9 @@ namespace SolarExpanseCargoTemplates
                 else t.items.Add(new TemplateItem { id = id, mass = Math.Round(one.Price, 2) });
             }
         }
+
+        public static void AddBuildingCost(CargoTemplate t, Data.ScriptableObject.FacilityBaseDescriptor f)
+            => AddCost(t, f.Price);
 
         /// <summary>All resources the game allows as cargo — the manager window's picker list.</summary>
         public static List<ResourceDefinition> AllCargoResources()

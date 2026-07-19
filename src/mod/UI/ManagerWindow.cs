@@ -117,8 +117,10 @@ namespace SolarExpanseCargoTemplates.UI
 
         GameObject _panelGO;
         Transform _scrollContent;
+        enum PickerKind { Resources, Buildings, Craft }
+
         int _pickingForIndex = -1;     // template index whose add-picker is open
-        bool _pickingBuildings;        // false = resource picker, true = building-cost picker
+        PickerKind _pickerKind;        // which list the open picker shows
         string _searchQuery = "";      // live filter for the pickers
         Transform _pickerList;         // container for picker rows (cleared on filter change)
 
@@ -226,7 +228,6 @@ namespace SolarExpanseCargoTemplates.UI
             _scrollContent = null;
             _pickerList = null;
             _pickingForIndex = -1;
-            _pickingBuildings = false;
         }
 
         /// <summary>
@@ -364,20 +365,19 @@ namespace SolarExpanseCargoTemplates.UI
                 }
 
                 var addRow = UIKit.MakeRow(_scrollContent);
-                UIKit.MakeButton(addRow.transform, Font, "+ ADD RESOURCE", () =>
+                void AddPickerButton(string label, PickerKind kind)
                 {
-                    _pickingForIndex = templateIndex;
-                    _pickingBuildings = false;
-                    _searchQuery = "";
-                    RebuildContent();
-                }, expandWidth: true, height: 26f, bgColor: new Color(0.10f, 0.14f, 0.20f, 0.9f));
-                UIKit.MakeButton(addRow.transform, Font, "+ FROM BUILDING COST", () =>
-                {
-                    _pickingForIndex = templateIndex;
-                    _pickingBuildings = true;
-                    _searchQuery = "";
-                    RebuildContent();
-                }, expandWidth: true, height: 26f, bgColor: new Color(0.10f, 0.14f, 0.20f, 0.9f));
+                    UIKit.MakeButton(addRow.transform, Font, label, () =>
+                    {
+                        _pickingForIndex = templateIndex;
+                        _pickerKind = kind;
+                        _searchQuery = "";
+                        RebuildContent();
+                    }, expandWidth: true, height: 26f, bgColor: new Color(0.10f, 0.14f, 0.20f, 0.9f));
+                }
+                AddPickerButton("+ RESOURCE", PickerKind.Resources);
+                AddPickerButton("+ BUILDING COST", PickerKind.Buildings);
+                AddPickerButton("+ SC & LV COST", PickerKind.Craft);
 
                 // Spacer between templates
                 UIKit.MakeLabel(_scrollContent, Font, "", 6f).GetComponent<LayoutElement>().minHeight = 8f;
@@ -394,7 +394,6 @@ namespace SolarExpanseCargoTemplates.UI
             UIKit.MakeButton(row.transform, Font, "← BACK", () =>
             {
                 _pickingForIndex = -1;
-                _pickingBuildings = false;
                 RebuildContent();
             }, fixedWidth: 90f, bgColor: UIKit.BtnBg);
             var search = UIKit.MakeInput(row.transform, Font, "", TMP_InputField.ContentType.Standard, 0f,
@@ -429,7 +428,7 @@ namespace SolarExpanseCargoTemplates.UI
             string q = (_searchQuery ?? "").Trim().ToLowerInvariant();
             bool Matches(string name) => q.Length == 0 || name.ToLowerInvariant().Contains(q);
 
-            if (_pickingBuildings)
+            if (_pickerKind == PickerKind.Buildings)
             {
                 var buildings = TemplateService.AvailableBuildings();
                 int shown = 0;
@@ -449,12 +448,37 @@ namespace SolarExpanseCargoTemplates.UI
                             TemplateStore.Save(list);
                         }
                         _pickingForIndex = -1;
-                        _pickingBuildings = false;
                         RebuildContent();
                     });
                 }
                 if (shown == 0)
                     UIKit.MakeLabel(_pickerList, Font, "No matching buildings.", muted: true);
+            }
+            else if (_pickerKind == PickerKind.Craft)
+            {
+                var craft = TemplateService.AvailableCraft();
+                int shown = 0;
+                foreach (var c in craft)
+                {
+                    var captured = c;
+                    string name = TemplateService.ResourceName(captured.id);
+                    if (!Matches(name)) continue;
+                    shown++;
+                    string label = $"{name}  <color=#8A8A8A>{TemplateService.SummarizePrice(captured.price)}</color>";
+                    UIKit.MakeIconButton(_pickerList, Font, captured.sprite, label, () =>
+                    {
+                        var list = TemplateStore.Load();
+                        if (_pickingForIndex >= 0 && _pickingForIndex < list.Count)
+                        {
+                            TemplateService.AddCost(list[_pickingForIndex], captured.price);
+                            TemplateStore.Save(list);
+                        }
+                        _pickingForIndex = -1;
+                        RebuildContent();
+                    });
+                }
+                if (shown == 0)
+                    UIKit.MakeLabel(_pickerList, Font, "No matching spacecraft or launch vehicles.", muted: true);
             }
             else
             {
