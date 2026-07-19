@@ -1,3 +1,5 @@
+
+
 # Solar Expanse Cargo Templates
 
 Tired of clicking through *Add Resources* eight times to load the same Research
@@ -8,6 +10,10 @@ however many you're building.
 
 A BepInEx plugin for Solar Expanse that lets you define reusable resource cargo
 templates and apply them to missions from the Plan Mission → Cargo step.
+
+| Define Cargo Template | Add Resources from Templates with Multiples |
+| --- | --- |
+| <img width="1112" height="950" alt="Screenshot 2026-07-18 230925" src="https://github.com/user-attachments/assets/3f4a2646-8c90-43c4-991e-f06097f9adc0" /> | <img width="987" height="610" alt="Screenshot 2026-07-18 231117" src="https://github.com/user-attachments/assets/ecb0667b-9c0a-44e3-b950-5ccfc8a0e152" /> |
 
 ## What it does
 
