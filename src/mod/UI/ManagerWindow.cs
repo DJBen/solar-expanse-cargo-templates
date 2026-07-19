@@ -105,6 +105,7 @@ namespace SolarExpanseCargoTemplates.UI
         RectTransform _rt;
         Canvas _canvas;
         RectTransform _canvasRT;
+        RectTransform _rootRT;
 
         bool _placed;
         float _spawnTime;
@@ -123,7 +124,22 @@ namespace SolarExpanseCargoTemplates.UI
             _rt = GetComponent<RectTransform>();
             _canvas = GetComponentInParent<Canvas>();
             _canvasRT = _canvas != null ? _canvas.GetComponent<RectTransform>() : null;
+            _rootRT = _canvas != null ? _canvas.rootCanvas.GetComponent<RectTransform>() : null;
             _spawnTime = Time.unscaledTime;
+        }
+
+        // Click probe: while the panel is open, log what the UI raycast hits — if some game
+        // window still covers our panel, its name shows up here.
+        void Update()
+        {
+            if (_panelGO == null || !Input.GetMouseButtonDown(0)) return;
+            var es = EventSystem.current;
+            if (es == null) return;
+            var ped = new PointerEventData(es) { position = Input.mousePosition };
+            var results = new List<RaycastResult>();
+            es.RaycastAll(ped, results);
+            for (int i = 0; i < results.Count && i < 3; i++)
+                Plugin.Log.LogInfo($"[CT] click hit {i}: {results[i].gameObject.name} (canvas {results[i].gameObject.GetComponentInParent<Canvas>()?.name})");
         }
 
         void LateUpdate()
@@ -257,23 +273,26 @@ namespace SolarExpanseCargoTemplates.UI
         /// <summary>Left-aligned under the button (clamped so it never leaves the screen).</summary>
         void PositionPanel()
         {
-            if (_panelGO == null || _rt == null) return;
+            if (_panelGO == null || _rt == null || _rootRT == null) return;
             var corners = new Vector3[4];
             _rt.GetWorldCorners(corners); // 0 = bottom-left
             Vector2 local;
             if (!RectTransformUtility.ScreenPointToLocalPointInRectangle(
-                    _canvasRT, new Vector2(corners[0].x, corners[0].y), Cam(), out local)) return;
+                    _rootRT, new Vector2(corners[0].x, corners[0].y), Cam(), out local)) return;
             local.y -= 4f;
-            Rect cr = _canvasRT.rect;
+            Rect cr = _rootRT.rect;
             local.x = Mathf.Clamp(local.x, cr.xMin, cr.xMax - PanelWidth);
             ((RectTransform)_panelGO.transform).anchoredPosition = local;
         }
 
         void BuildPanel()
         {
-            if (_canvas == null || _rt == null) return;
+            if (_canvas == null || _rt == null || _rootRT == null) return;
 
-            _panelGO = UIKit.MakeVPanel("modCargoTemplatesPanel", _canvas.transform, PanelWidth, fitHeight: true);
+            // Parent to the ROOT canvas as last sibling: the top-bar's sub-branch renders below
+            // game windows (the contracts list drew — and raycast-blocked — on top of the panel).
+            _panelGO = UIKit.MakeVPanel("modCargoTemplatesPanel", _rootRT.transform, PanelWidth, fitHeight: true);
+            _panelGO.transform.SetAsLastSibling();
             _panelGO.AddComponent<LayoutElement>().ignoreLayout = true;
             var panelRT = (RectTransform)_panelGO.transform;
             panelRT.pivot = new Vector2(0f, 1f); // left-aligned dropdown, same as launch-windows
@@ -285,6 +304,7 @@ namespace SolarExpanseCargoTemplates.UI
             title.fontStyle = TMPro.FontStyles.Bold;
             UIKit.MakeButton(header.transform, Font, "+ NEW", () =>
             {
+                Plugin.Log.LogInfo("[CT] + NEW clicked");
                 var list = TemplateStore.Load();
                 list.Add(new CargoTemplate { name = NextName(list) });
                 TemplateStore.Save(list);
