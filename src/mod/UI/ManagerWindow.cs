@@ -124,6 +124,8 @@ namespace SolarExpanseCargoTemplates.UI
         PickerKind _pickerKind;        // which list the open picker shows
         string _searchQuery = "";      // live filter for the pickers
         Transform _pickerList;         // container for picker rows (cleared on filter change)
+        float _templateScrollY;        // template-view scroll offset, saved when entering a picker
+        bool _useSavedTemplateScroll;  // restore _templateScrollY on the next template-view rebuild
 
         void Awake()
         {
@@ -308,13 +310,37 @@ namespace SolarExpanseCargoTemplates.UI
             return Candidate(n);
         }
 
+        float ContentY() => _scrollContent != null ? ((RectTransform)_scrollContent).anchoredPosition.y : 0f;
+
+        System.Collections.IEnumerator RestoreScrollNextFrame(float y)
+        {
+            yield return null; // let the layout system size the fresh rows first
+            if (_scrollContent == null) yield break;
+            var rt = (RectTransform)_scrollContent;
+            var viewport = rt.parent as RectTransform;
+            float max = viewport != null ? Mathf.Max(rt.rect.height - viewport.rect.height, 0f) : y;
+            rt.anchoredPosition = new Vector2(rt.anchoredPosition.x, Mathf.Clamp(y, 0f, max));
+        }
+
         void RebuildContent()
         {
             if (_scrollContent == null) return;
+            float currentY = ContentY();
             UIKit.ClearChildren(_scrollContent);
             _pickerList = null;
 
-            if (_pickingForIndex >= 0) { BuildPicker(); return; }
+            if (_pickingForIndex >= 0)
+            {
+                BuildPicker();
+                StartCoroutine(RestoreScrollNextFrame(0f)); // pickers always start at the top
+                return;
+            }
+
+            // Keep the user's place in the template list: same-view rebuilds (fold, delete, + NEW)
+            // keep the current offset; returning from a picker restores the saved one.
+            float restoreY = _useSavedTemplateScroll ? _templateScrollY : currentY;
+            _useSavedTemplateScroll = false;
+            StartCoroutine(RestoreScrollNextFrame(restoreY));
 
             var templates = TemplateStore.Load();
             if (templates.Count == 0)
@@ -395,6 +421,7 @@ namespace SolarExpanseCargoTemplates.UI
                 {
                     UIKit.MakeButton(addRow.transform, Font, label, () =>
                     {
+                        _templateScrollY = ContentY(); // come back to this spot after picking
                         _pickingForIndex = templateIndex;
                         _pickerKind = kind;
                         _searchQuery = "";
@@ -420,6 +447,7 @@ namespace SolarExpanseCargoTemplates.UI
             UIKit.MakeButton(row.transform, Font, "← BACK", () =>
             {
                 _pickingForIndex = -1;
+                _useSavedTemplateScroll = true;
                 RebuildContent();
             }, fixedWidth: 90f, bgColor: UIKit.BtnBg);
             var search = UIKit.MakeInput(row.transform, Font, "", TMP_InputField.ContentType.Standard, 0f,
@@ -476,6 +504,7 @@ namespace SolarExpanseCargoTemplates.UI
                             TemplateStore.Save(list);
                         }
                         _pickingForIndex = -1;
+                        _useSavedTemplateScroll = true;
                         RebuildContent();
                     });
                 }
@@ -503,6 +532,7 @@ namespace SolarExpanseCargoTemplates.UI
                             TemplateStore.Save(list);
                         }
                         _pickingForIndex = -1;
+                        _useSavedTemplateScroll = true;
                         RebuildContent();
                     });
                 }
@@ -528,6 +558,7 @@ namespace SolarExpanseCargoTemplates.UI
                             TemplateStore.Save(list);
                         }
                         _pickingForIndex = -1;
+                        _useSavedTemplateScroll = true;
                         RebuildContent();
                     }, expandWidth: true, height: 26f, alignLeft: true);
                 }
