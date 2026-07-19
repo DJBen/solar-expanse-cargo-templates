@@ -119,6 +119,7 @@ namespace SolarExpanseCargoTemplates.UI
         Transform _scrollContent;
         int _pickingForIndex = -1;     // template index whose add-picker is open
         bool _pickingBuildings;        // false = resource picker, true = building-cost picker
+        string _searchQuery = "";      // live filter for the pickers
 
         void Awake()
         {
@@ -315,12 +316,7 @@ namespace SolarExpanseCargoTemplates.UI
             if (_scrollContent == null) return;
             UIKit.ClearChildren(_scrollContent);
 
-            if (_pickingForIndex >= 0)
-            {
-                if (_pickingBuildings) BuildBuildingPicker();
-                else BuildResourcePicker();
-                return;
-            }
+            if (_pickingForIndex >= 0) { BuildPicker(); return; }
 
             var templates = TemplateStore.Load();
             if (templates.Count == 0)
@@ -353,7 +349,7 @@ namespace SolarExpanseCargoTemplates.UI
                     int itemIndex = j;
                     var item = t.items[j];
                     var row = UIKit.MakeRow(_scrollContent);
-                    UIKit.MakeLabel(row.transform, Font, "    " + TemplateService.ResourceName(item.id),
+                    UIKit.MakeLabel(row.transform, Font, "    " + TemplateService.ResourceLabel(item.id),
                         expandWidth: true);
                     UIKit.MakeInput(row.transform, Font,
                         item.mass.ToString("0.##", CultureInfo.InvariantCulture),
@@ -381,12 +377,14 @@ namespace SolarExpanseCargoTemplates.UI
                 {
                     _pickingForIndex = templateIndex;
                     _pickingBuildings = false;
+                    _searchQuery = "";
                     RebuildContent();
                 }, expandWidth: true, height: 26f, bgColor: new Color(0.10f, 0.14f, 0.20f, 0.9f));
                 UIKit.MakeButton(addRow.transform, Font, "+ FROM BUILDING COST", () =>
                 {
                     _pickingForIndex = templateIndex;
                     _pickingBuildings = true;
+                    _searchQuery = "";
                     RebuildContent();
                 }, expandWidth: true, height: 26f, bgColor: new Color(0.10f, 0.14f, 0.20f, 0.9f));
 
@@ -395,63 +393,91 @@ namespace SolarExpanseCargoTemplates.UI
             }
         }
 
-        /// <summary>Picker of constructible buildings; choosing one merges its resource cost into the template.</summary>
-        void BuildBuildingPicker()
+        /// <summary>
+        /// Shared picker view: [← BACK][search] header, then the filtered list (resources or
+        /// building costs). Only the list rebuilds while typing, so the search field keeps focus.
+        /// </summary>
+        void BuildPicker()
         {
-            UIKit.MakeButton(_scrollContent, Font, "← BACK", () =>
+            var row = UIKit.MakeRow(_scrollContent);
+            UIKit.MakeButton(row.transform, Font, "← BACK", () =>
             {
                 _pickingForIndex = -1;
                 _pickingBuildings = false;
                 RebuildContent();
-            }, expandWidth: true, bgColor: UIKit.BtnBg);
-
-            var buildings = TemplateService.AvailableBuildings();
-            if (buildings.Count == 0)
-                UIKit.MakeLabel(_scrollContent, Font, "No constructible buildings found.", muted: true);
-
-            foreach (var f in buildings)
+            }, fixedWidth: 90f, bgColor: UIKit.BtnBg);
+            var search = UIKit.MakeInput(row.transform, Font, "", TMP_InputField.ContentType.Standard, 0f,
+                null, expandWidth: true, placeholder: "Search…");
+            search.onValueChanged.AddListener(v =>
             {
-                var captured = f;
-                string label = $"{TemplateService.ResourceName(captured.ID)}  " +
-                               $"<color=#8A8A8A>{TemplateService.SummarizePrice(captured)}</color>";
-                UIKit.MakeIconButton(_scrollContent, Font, captured.Sprite, label, () =>
-                {
-                    var list = TemplateStore.Load();
-                    if (_pickingForIndex >= 0 && _pickingForIndex < list.Count)
-                    {
-                        TemplateService.AddBuildingCost(list[_pickingForIndex], captured);
-                        TemplateStore.Save(list);
-                    }
-                    _pickingForIndex = -1;
-                    _pickingBuildings = false;
-                    RebuildContent();
-                });
-            }
+                _searchQuery = v ?? "";
+                PopulatePickerList();
+            });
+
+            PopulatePickerList();
         }
 
-        void BuildResourcePicker()
+        /// <summary>(Re)build everything below the picker's search row.</summary>
+        void PopulatePickerList()
         {
-            UIKit.MakeButton(_scrollContent, Font, "← BACK", () =>
-            {
-                _pickingForIndex = -1;
-                RebuildContent();
-            }, expandWidth: true, bgColor: UIKit.BtnBg);
+            if (_scrollContent == null || _scrollContent.childCount == 0) return;
+            for (int i = _scrollContent.childCount - 1; i >= 1; i--)
+                Destroy(_scrollContent.GetChild(i).gameObject);
 
-            foreach (var rd in TemplateService.AllCargoResources())
+            string q = (_searchQuery ?? "").Trim().ToLowerInvariant();
+            bool Matches(string name) => q.Length == 0 || name.ToLowerInvariant().Contains(q);
+
+            if (_pickingBuildings)
             {
-                if (rd == null) continue;
-                string id = rd.ID;
-                UIKit.MakeButton(_scrollContent, Font, TemplateService.ResourceName(id), () =>
+                var buildings = TemplateService.AvailableBuildings();
+                int shown = 0;
+                foreach (var f in buildings)
                 {
-                    var list = TemplateStore.Load();
-                    if (_pickingForIndex >= 0 && _pickingForIndex < list.Count)
+                    var captured = f;
+                    string name = TemplateService.ResourceName(captured.ID);
+                    if (!Matches(name)) continue;
+                    shown++;
+                    string label = $"{name}  <color=#8A8A8A>{TemplateService.SummarizePrice(captured)}</color>";
+                    UIKit.MakeIconButton(_scrollContent, Font, captured.Sprite, label, () =>
                     {
-                        list[_pickingForIndex].items.Add(new TemplateItem { id = id, mass = 100 });
-                        TemplateStore.Save(list);
-                    }
-                    _pickingForIndex = -1;
-                    RebuildContent();
-                }, expandWidth: true, height: 26f, alignLeft: true);
+                        var list = TemplateStore.Load();
+                        if (_pickingForIndex >= 0 && _pickingForIndex < list.Count)
+                        {
+                            TemplateService.AddBuildingCost(list[_pickingForIndex], captured);
+                            TemplateStore.Save(list);
+                        }
+                        _pickingForIndex = -1;
+                        _pickingBuildings = false;
+                        RebuildContent();
+                    });
+                }
+                if (shown == 0)
+                    UIKit.MakeLabel(_scrollContent, Font, "No matching buildings.", muted: true);
+            }
+            else
+            {
+                int shown = 0;
+                foreach (var rd in TemplateService.AllCargoResources())
+                {
+                    if (rd == null) continue;
+                    string id = rd.ID;
+                    string name = TemplateService.ResourceName(id);
+                    if (!Matches(name)) continue;
+                    shown++;
+                    UIKit.MakeButton(_scrollContent, Font, TemplateService.ResourceLabel(id), () =>
+                    {
+                        var list = TemplateStore.Load();
+                        if (_pickingForIndex >= 0 && _pickingForIndex < list.Count)
+                        {
+                            list[_pickingForIndex].items.Add(new TemplateItem { id = id, mass = 100 });
+                            TemplateStore.Save(list);
+                        }
+                        _pickingForIndex = -1;
+                        RebuildContent();
+                    }, expandWidth: true, height: 26f, alignLeft: true);
+                }
+                if (shown == 0)
+                    UIKit.MakeLabel(_scrollContent, Font, "No matching resources.", muted: true);
             }
         }
     }

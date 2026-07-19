@@ -47,7 +47,7 @@ namespace SolarExpanseCargoTemplates
             return result;
         }
 
-        /// <summary>"Metal 120t · Water 30t" for a building's construction cost.</summary>
+        /// <summary>"[icon] 120t · [icon] 30t" for a building's construction cost.</summary>
         public static string SummarizePrice(Data.ScriptableObject.FacilityBaseDescriptor f)
         {
             var parts = new List<string>();
@@ -55,7 +55,9 @@ namespace SolarExpanseCargoTemplates
             {
                 var rd = one.ResourceDefinition;
                 if (rd == null) continue;
-                parts.Add($"{ResourceName(rd.ID)} {one.Price:0.#}t");
+                string icon;
+                try { icon = rd.IconString + " "; } catch { icon = ResourceName(rd.ID) + " "; }
+                parts.Add($"{icon}{one.Price:0.#}t");
             }
             return string.Join(" · ", parts);
         }
@@ -80,6 +82,18 @@ namespace SolarExpanseCargoTemplates
             var all = SerializedMonoBehaviourSingleton<AllScriptableObjectManager>.Instance;
             if (all == null) return new List<ResourceDefinition>();
             return all.AllResourceDefinitions.ListResourceDefinitionTakeAsCargo ?? new List<ResourceDefinition>();
+        }
+
+        /// <summary>
+        /// "&lt;sprite …&gt; Name" — icon + name via the game's own TMP sprite markup
+        /// (ResourceDefinition.IconString), falling back to plain name if the resource is unknown.
+        /// </summary>
+        public static string ResourceLabel(string id)
+        {
+            ResourceDefinition rd = GetResource(id);
+            if (rd == null) return ResourceName(id);
+            try { return rd.IconString + " " + ResourceName(id); }
+            catch { return ResourceName(id); }
         }
 
         /// <summary>Resource name for UI labels, falling back to the raw id.</summary>

@@ -135,7 +135,8 @@ namespace SolarExpanseCargoTemplates.UI
 
         public static TMP_InputField MakeInput(Transform parent, TMP_FontAsset font, string initial,
                                                TMP_InputField.ContentType contentType, float width,
-                                               Action<string> onEndEdit, float height = 30f, bool expandWidth = false)
+                                               Action<string> onEndEdit, float height = 30f, bool expandWidth = false,
+                                               string placeholder = null)
         {
             var go = new GameObject("Input", typeof(RectTransform));
             go.transform.SetParent(parent, false);
@@ -170,10 +171,30 @@ namespace SolarExpanseCargoTemplates.UI
             tmp.alignment = TextAlignmentOptions.Left;
             tmp.enableWordWrapping = false;
 
+            TextMeshProUGUI placeholderTmp = null;
+            if (!string.IsNullOrEmpty(placeholder))
+            {
+                var phGO = new GameObject("Placeholder", typeof(RectTransform));
+                phGO.transform.SetParent(areaGO.transform, false);
+                var phRT = (RectTransform)phGO.transform;
+                phRT.anchorMin = Vector2.zero;
+                phRT.anchorMax = Vector2.one;
+                phRT.offsetMin = Vector2.zero;
+                phRT.offsetMax = Vector2.zero;
+                placeholderTmp = phGO.AddComponent<TextMeshProUGUI>();
+                if (font != null) placeholderTmp.font = font;
+                placeholderTmp.fontSize = 16f;
+                placeholderTmp.fontStyle = FontStyles.Italic;
+                placeholderTmp.color = new Color(0.6f, 0.6f, 0.6f, 0.75f);
+                placeholderTmp.text = placeholder;
+                placeholderTmp.enableWordWrapping = false;
+            }
+
             var input = go.AddComponent<TMP_InputField>();
             input.targetGraphic = img;
             input.textViewport = areaRT;
             input.textComponent = tmp;
+            if (placeholderTmp != null) input.placeholder = placeholderTmp;
             input.contentType = contentType;
             input.text = initial;
             // Make the focused state unmistakable: brighter field + visible caret/selection.
