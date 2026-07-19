@@ -39,7 +39,9 @@ namespace SolarExpanseCargoTemplates
                 ? MonoBehaviourSingleton<GameManager>.Instance.Player : null;
             foreach (var f in all.AllFacility.ListNotEmpty)
             {
-                if (f == null || f.IsLocked) continue;
+                if (f == null) continue;
+                // IsLocked only means "research-gated" — IsUnlockFacility already returns true
+                // for both never-locked facilities and ones the player has since unlocked.
                 if (player != null && !player.IsUnlockFacility(f)) continue;
                 if (f.Price == null || f.Price.ListResources == null || f.Price.ListResources.Count == 0) continue;
                 result.Add(f);
