@@ -1,8 +1,13 @@
 # Solar Expanse Cargo Templates
 
+Tired of clicking through *Add Resources* eight times to load the same Research
+Laboratory cargo for the third mission in a row? This mod solves that pain:
+define the load once as a template — or seed it straight from any building's
+construction cost — and drop it into a mission with one click, multiplied by
+however many you're building.
+
 A BepInEx plugin for Solar Expanse that lets you define reusable resource cargo
-templates and apply them to missions from the Plan Mission → Cargo step —
-optionally seeded from the construction cost of any building you can build.
+templates and apply them to missions from the Plan Mission → Cargo step.
 
 ## What it does
 
