@@ -57,7 +57,7 @@ namespace SolarExpanseCargoTemplates
                 if (rd == null) continue;
                 string icon;
                 try { icon = rd.IconString + " "; } catch { icon = ResourceName(rd.ID) + " "; }
-                parts.Add($"{icon}{one.Price:0.#}t");
+                parts.Add($"{icon}{FormatMass(one.Price)}");
             }
             return string.Join(" · ", parts);
         }
@@ -125,6 +125,14 @@ namespace SolarExpanseCargoTemplates
         /// Items whose required amount exceeds the origin's stock (or whose resource is unknown)
         /// have their amount rendered red. Meant for a wrapping multi-line label.
         /// </summary>
+        /// <summary>"850t", "15kt", "1.5Mt" — compact tonnage for summaries.</summary>
+        public static string FormatMass(double tons)
+        {
+            if (tons >= 1e6) return $"{tons / 1e6:0.##}Mt";
+            if (tons >= 1e3) return $"{tons / 1e3:0.##}kt";
+            return $"{tons:0.##}t";
+        }
+
         public static string SummarizeForOrigin(PMTabCargo tab, CargoTemplate t, int multiplier)
         {
             var parts = new List<string>();
@@ -135,7 +143,7 @@ namespace SolarExpanseCargoTemplates
                 bool short_ = rd == null || AvailableAtOrigin(tab, rd) + 1e-9 < needed;
                 string icon;
                 try { icon = rd != null ? rd.IconString + " " : ""; } catch { icon = ""; }
-                string amount = $"{needed:0.##}t";
+                string amount = FormatMass(needed);
                 // The sprite ignores the color tag; the amount text carries the red signal.
                 parts.Add(icon + (short_ ? $"<color={RedHex}>{amount}</color>" : amount));
             }
@@ -146,7 +154,7 @@ namespace SolarExpanseCargoTemplates
         {
             var parts = new List<string>();
             foreach (var item in t.items)
-                parts.Add($"{ResourceName(item.id)} {item.mass:0.##}t");
+                parts.Add($"{ResourceName(item.id)} {FormatMass(item.mass)}");
             return string.Join(" · ", parts);
         }
 
