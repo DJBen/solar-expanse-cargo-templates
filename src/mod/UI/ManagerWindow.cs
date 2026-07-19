@@ -168,8 +168,8 @@ namespace SolarExpanseCargoTemplates.UI
             Vector2 topLeft;
             if (!RectTransformUtility.ScreenPointToLocalPointInRectangle(
                     _canvasRT, new Vector2(corners[1].x, corners[1].y), cam, out topLeft)) return;
-            // Nudged a few px above the reference so the label doesn't overlay the UI below it.
-            _rt.anchoredPosition = new Vector2(topLeft.x - 6f - _rt.sizeDelta.x, topLeft.y + 8f);
+            // Nudged above the reference so the label doesn't overlay the UI below it.
+            _rt.anchoredPosition = new Vector2(topLeft.x - 6f - _rt.sizeDelta.x, topLeft.y + 40f);
             Clamp();
         }
 
