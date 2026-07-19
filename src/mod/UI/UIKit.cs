@@ -8,12 +8,31 @@ namespace SolarExpanseCargoTemplates.UI
     /// <summary>Tiny programmatic uGUI builders shared by the dropdown and the manager window.</summary>
     internal static class UIKit
     {
-        public static readonly Color PanelBg = new Color(0.06f, 0.07f, 0.09f, 0.97f);
-        public static readonly Color BtnBg = new Color(0.12f, 0.14f, 0.18f, 0.9f);
-        public static readonly Color BtnHover = new Color(0.20f, 0.35f, 0.45f, 0.9f);
+        // Palette matches solar-expanse-launch-windows (dropdown panels / items / hover).
+        public static readonly Color PanelBg = new Color(0.10f, 0.11f, 0.13f, 0.98f);
+        public static readonly Color BtnBg = new Color(0.12f, 0.14f, 0.17f, 0.9f);
+        public static readonly Color BtnHover = new Color(0.20f, 0.24f, 0.30f, 1f);
         public static readonly Color Accent = new Color(0.10f, 0.22f, 0.14f, 0.9f);
         public static readonly Color Danger = new Color(0.30f, 0.10f, 0.10f, 0.9f);
-        public static readonly Color InputBg = new Color(0.02f, 0.03f, 0.04f, 0.95f);
+        public static readonly Color InputBg = new Color(0.05f, 0.06f, 0.07f, 0.95f);
+
+        static TMP_FontAsset headerFont;
+        static bool headerFontSearched;
+
+        /// <summary>Oxanium — the game's heading font — with graceful fallback (same as launch-windows).</summary>
+        public static TMP_FontAsset HeaderFont(TMP_FontAsset fallback)
+        {
+            if (!headerFontSearched)
+            {
+                headerFontSearched = true;
+                foreach (var f in Resources.FindObjectsOfTypeAll<TMP_FontAsset>())
+                {
+                    var n = f.name ?? "";
+                    if (n.IndexOf("Oxanium", StringComparison.OrdinalIgnoreCase) >= 0) { headerFont = f; break; }
+                }
+            }
+            return headerFont != null ? headerFont : fallback;
+        }
 
         public static GameObject MakeVPanel(string name, Transform parent, float width, bool fitHeight = true)
         {
@@ -21,8 +40,8 @@ namespace SolarExpanseCargoTemplates.UI
             go.transform.SetParent(parent, false);
             go.AddComponent<Image>().color = PanelBg;
             var vlg = go.AddComponent<VerticalLayoutGroup>();
-            vlg.padding = new RectOffset(8, 8, 8, 8);
-            vlg.spacing = 4f;
+            vlg.padding = new RectOffset(9, 9, 5, 5);
+            vlg.spacing = 2f;
             vlg.childForceExpandWidth = true;
             vlg.childForceExpandHeight = false;
             vlg.childControlWidth = true;
@@ -49,7 +68,7 @@ namespace SolarExpanseCargoTemplates.UI
         }
 
         public static TextMeshProUGUI MakeLabel(Transform parent, TMP_FontAsset font, string text,
-                                                 float fontSize = 14f, bool muted = false,
+                                                 float fontSize = 16f, bool muted = false,
                                                  bool expandWidth = false, float fixedWidth = 0f)
         {
             var go = new GameObject("Label", typeof(RectTransform));
@@ -58,7 +77,7 @@ namespace SolarExpanseCargoTemplates.UI
             if (font != null) tmp.font = font;
             tmp.text = text;
             tmp.fontSize = fontSize;
-            tmp.color = muted ? new Color(1f, 1f, 1f, 0.45f) : Color.white;
+            tmp.color = muted ? new Color(0.6f, 0.6f, 0.6f) : Color.white;
             tmp.alignment = TextAlignmentOptions.Left;
             tmp.enableWordWrapping = false;
             tmp.overflowMode = TextOverflowModes.Ellipsis;
@@ -100,7 +119,7 @@ namespace SolarExpanseCargoTemplates.UI
             label = lblGO.AddComponent<TextMeshProUGUI>();
             if (font != null) label.font = font;
             label.text = text;
-            label.fontSize = 14f;
+            label.fontSize = 15f;
             label.color = Color.white;
             label.alignment = alignLeft ? TextAlignmentOptions.Left : TextAlignmentOptions.Center;
             label.enableWordWrapping = false;
@@ -145,7 +164,7 @@ namespace SolarExpanseCargoTemplates.UI
             textRT.offsetMax = Vector2.zero;
             var tmp = textGO.AddComponent<TextMeshProUGUI>();
             if (font != null) tmp.font = font;
-            tmp.fontSize = 14f;
+            tmp.fontSize = 16f;
             tmp.color = Color.white;
             tmp.alignment = TextAlignmentOptions.Left;
             tmp.enableWordWrapping = false;

@@ -188,7 +188,9 @@ namespace SolarExpanseCargoTemplates.UI
 
             // Header
             var header = UIKit.MakeRow(_panelGO.transform);
-            UIKit.MakeLabel(header.transform, Font, "CARGO TEMPLATES", 15f, muted: false, expandWidth: true);
+            var title = UIKit.MakeLabel(header.transform, UIKit.HeaderFont(Font), "CARGO TEMPLATES", 15f,
+                muted: false, expandWidth: true);
+            title.fontStyle = TMPro.FontStyles.Bold;
             UIKit.MakeButton(header.transform, Font, "+ NEW", () =>
             {
                 var list = TemplateStore.Load();
