@@ -1,11 +1,11 @@
 using System;
-using System.Collections;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Reflection;
 using Manager;
 using TMPro;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
 namespace SolarExpanseCargoTemplates.UI
@@ -90,17 +90,29 @@ namespace SolarExpanseCargoTemplates.UI
         }
     }
 
-    /// <summary>Positions the top-bar button (left of other mod buttons) and owns the editor panel.</summary>
-    internal class CTMover : MonoBehaviour
+    /// <summary>
+    /// Places the top-bar button once (left of the other mod buttons, waiting for them to settle),
+    /// then makes it independently draggable — same interaction model as launch-windows' LWMover.
+    /// Owns the editor panel (left-aligned under the button, clamped to the screen).
+    /// </summary>
+    internal class CTMover : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHandler
     {
+        const float PanelWidth = 560f;
+
         internal RectTransform ShowBtnRT;
         internal TMP_FontAsset Font;
 
         RectTransform _rt;
         Canvas _canvas;
         RectTransform _canvasRT;
-        RectTransform _refRT;
-        float _nextRefScan;
+
+        bool _placed;
+        float _spawnTime;
+        Vector2 _lastCanvasSize;
+        Vector2 _normalizedPos;
+        bool _normalizedPosSet;
+        Vector2 _dragStartAnchored;
+        Vector2 _dragStartScreen;
 
         GameObject _panelGO;
         Transform _scrollContent;
@@ -111,48 +123,53 @@ namespace SolarExpanseCargoTemplates.UI
             _rt = GetComponent<RectTransform>();
             _canvas = GetComponentInParent<Canvas>();
             _canvasRT = _canvas != null ? _canvas.GetComponent<RectTransform>() : null;
+            _spawnTime = Time.unscaledTime;
         }
 
-        IEnumerator Start()
-        {
-            yield return null;
-            yield return null;
-            LateUpdate();
-        }
-
-        // The other mod buttons (launch windows / life support / …) settle their positions a few
-        // frames after Awake — and this plugin can load BEFORE them. So: rescan for the leftmost
-        // reference button once a second, and follow it every frame (GetWorldCorners is cheap).
         void LateUpdate()
         {
             if (_rt == null || _canvasRT == null || _canvas == null) return;
-            if (Time.unscaledTime >= _nextRefScan || _refRT == null)
-            {
-                _nextRefScan = Time.unscaledTime + 1f;
-                _refRT = FindReferenceButton() ?? ShowBtnRT;
-            }
-            if (_refRT == null) return;
 
-            Camera cam = _canvas.renderMode == RenderMode.ScreenSpaceOverlay ? null : _canvas.worldCamera;
+            if (!_placed)
+            {
+                // Wait for the other mod buttons to leave their -9999 staging position; after 3s
+                // give up on them and anchor to the notification button instead.
+                RectTransform refRT = FindReferenceButton();
+                if (refRT == null && Time.unscaledTime - _spawnTime > 3f) refRT = ShowBtnRT;
+                if (refRT == null) return;
+                PlaceLeftOf(refRT);
+                _placed = true;
+                StoreNormalizedPos();
+                _lastCanvasSize = _canvasRT.rect.size;
+                return;
+            }
+
+            // Keep position stable across resolution changes; otherwise the button stays where
+            // the user dragged it — it does NOT follow the other buttons around.
+            Vector2 sz = _canvasRT.rect.size;
+            if (sz != _lastCanvasSize)
+            {
+                _lastCanvasSize = sz;
+                RestoreFromNormalizedPos();
+                PositionPanel();
+            }
+        }
+
+        void PlaceLeftOf(RectTransform refRT)
+        {
+            Camera cam = Cam();
             var corners = new Vector3[4];
-            _refRT.GetWorldCorners(corners); // 1 = top-left
+            refRT.GetWorldCorners(corners); // 1 = top-left
             Vector2 topLeft;
             if (!RectTransformUtility.ScreenPointToLocalPointInRectangle(
                     _canvasRT, new Vector2(corners[1].x, corners[1].y), cam, out topLeft)) return;
             _rt.anchoredPosition = new Vector2(topLeft.x - 6f - _rt.sizeDelta.x, topLeft.y);
-            PositionPanel();
+            Clamp();
         }
 
-        void PositionPanel()
-        {
-            if (_panelGO == null || _rt == null) return;
-            var corners = new Vector3[4];
-            _rt.GetWorldCorners(corners); // 3 = bottom-right
-            _panelGO.transform.position = corners[3];
-            ((RectTransform)_panelGO.transform).anchoredPosition += new Vector2(0f, -4f);
-        }
+        Camera Cam() => _canvas.renderMode == RenderMode.ScreenSpaceOverlay ? null : _canvas.worldCamera;
 
-        /// <summary>Chain to the left of whichever known mod button is present (leftmost wins).</summary>
+        /// <summary>Leftmost settled mod button (ignores ones still parked offscreen).</summary>
         RectTransform FindReferenceButton()
         {
             if (_canvas == null) return null;
@@ -168,7 +185,6 @@ namespace SolarExpanseCargoTemplates.UI
                      n.Equals("modFleetTrackerButton", StringComparison.OrdinalIgnoreCase)) &&
                     rt.GetComponent<Image>() != null)
                 {
-                    // Ignore buttons still parked at their offscreen staging position (-9999).
                     var pos = rt.anchoredPosition;
                     if (pos.x < -4000f || pos.y < -4000f) continue;
                     if (best == null || pos.x < bestX) { best = rt; bestX = pos.x; }
@@ -176,6 +192,54 @@ namespace SolarExpanseCargoTemplates.UI
             }
             return best;
         }
+
+        // ── Drag (independent of the other mod buttons) ─────────────────────────────────────
+
+        public void OnBeginDrag(PointerEventData e)
+        {
+            _dragStartAnchored = _rt.anchoredPosition;
+            _dragStartScreen = e.position;
+        }
+
+        public void OnDrag(PointerEventData e)
+        {
+            Camera cam = Cam();
+            Vector2 cur, start;
+            if (!RectTransformUtility.ScreenPointToLocalPointInRectangle(_canvasRT, e.position, cam, out cur)) return;
+            if (!RectTransformUtility.ScreenPointToLocalPointInRectangle(_canvasRT, _dragStartScreen, cam, out start)) return;
+            _rt.anchoredPosition = _dragStartAnchored + (cur - start);
+            Clamp();
+            PositionPanel();
+        }
+
+        public void OnEndDrag(PointerEventData e) => StoreNormalizedPos();
+
+        void Clamp()
+        {
+            Rect cr = _canvasRT.rect;
+            Vector2 s = _rt.sizeDelta, p = _rt.anchoredPosition;
+            p.x = Mathf.Clamp(p.x, cr.xMin, cr.xMax - s.x);
+            p.y = Mathf.Clamp(p.y, cr.yMin + s.y, cr.yMax);
+            _rt.anchoredPosition = p;
+        }
+
+        void StoreNormalizedPos()
+        {
+            Rect cr = _canvasRT.rect;
+            if (cr.xMax <= 0f || cr.yMax <= 0f) return;
+            _normalizedPos = new Vector2(_rt.anchoredPosition.x / cr.xMax, _rt.anchoredPosition.y / cr.yMax);
+            _normalizedPosSet = true;
+        }
+
+        void RestoreFromNormalizedPos()
+        {
+            if (!_normalizedPosSet) return;
+            Rect cr = _canvasRT.rect;
+            _rt.anchoredPosition = new Vector2(_normalizedPos.x * cr.xMax, _normalizedPos.y * cr.yMax);
+            Clamp();
+        }
+
+        // ── Panel ───────────────────────────────────────────────────────────────────────────
 
         internal void TogglePanel()
         {
@@ -190,14 +254,29 @@ namespace SolarExpanseCargoTemplates.UI
             _pickingForIndex = -1;
         }
 
+        /// <summary>Left-aligned under the button (clamped so it never leaves the screen).</summary>
+        void PositionPanel()
+        {
+            if (_panelGO == null || _rt == null) return;
+            var corners = new Vector3[4];
+            _rt.GetWorldCorners(corners); // 0 = bottom-left
+            Vector2 local;
+            if (!RectTransformUtility.ScreenPointToLocalPointInRectangle(
+                    _canvasRT, new Vector2(corners[0].x, corners[0].y), Cam(), out local)) return;
+            local.y -= 4f;
+            Rect cr = _canvasRT.rect;
+            local.x = Mathf.Clamp(local.x, cr.xMin, cr.xMax - PanelWidth);
+            ((RectTransform)_panelGO.transform).anchoredPosition = local;
+        }
+
         void BuildPanel()
         {
             if (_canvas == null || _rt == null) return;
 
-            _panelGO = UIKit.MakeVPanel("modCargoTemplatesPanel", _canvas.transform, 560f, fitHeight: true);
+            _panelGO = UIKit.MakeVPanel("modCargoTemplatesPanel", _canvas.transform, PanelWidth, fitHeight: true);
             _panelGO.AddComponent<LayoutElement>().ignoreLayout = true;
             var panelRT = (RectTransform)_panelGO.transform;
-            panelRT.pivot = new Vector2(1f, 1f); // grow down-left: the button sits near the right edge
+            panelRT.pivot = new Vector2(0f, 1f); // left-aligned dropdown, same as launch-windows
 
             // Header
             var header = UIKit.MakeRow(_panelGO.transform);
@@ -215,8 +294,6 @@ namespace SolarExpanseCargoTemplates.UI
 
             _scrollContent = UIKit.MakeScroll(_panelGO.transform, 430f);
             RebuildContent();
-
-            // Place under the button, right-aligned to it.
             PositionPanel();
         }
 
