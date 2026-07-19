@@ -99,7 +99,8 @@ namespace SolarExpanseCargoTemplates.UI
         RectTransform _rt;
         Canvas _canvas;
         RectTransform _canvasRT;
-        Vector2 _lastCanvasSize;
+        RectTransform _refRT;
+        float _nextRefScan;
 
         GameObject _panelGO;
         Transform _scrollContent;
@@ -116,31 +117,39 @@ namespace SolarExpanseCargoTemplates.UI
         {
             yield return null;
             yield return null;
-            PositionButton();
+            LateUpdate();
         }
 
-        void Update()
+        // The other mod buttons (launch windows / life support / …) settle their positions a few
+        // frames after Awake — and this plugin can load BEFORE them. So: rescan for the leftmost
+        // reference button once a second, and follow it every frame (GetWorldCorners is cheap).
+        void LateUpdate()
         {
-            if (_canvasRT == null) return;
-            Vector2 sz = _canvasRT.rect.size;
-            if (sz != _lastCanvasSize)
+            if (_rt == null || _canvasRT == null || _canvas == null) return;
+            if (Time.unscaledTime >= _nextRefScan || _refRT == null)
             {
-                _lastCanvasSize = sz;
-                PositionButton();
+                _nextRefScan = Time.unscaledTime + 1f;
+                _refRT = FindReferenceButton() ?? ShowBtnRT;
             }
-        }
+            if (_refRT == null) return;
 
-        void PositionButton()
-        {
-            RectTransform refRT = FindReferenceButton() ?? ShowBtnRT;
-            if (refRT == null || _rt == null || _canvasRT == null || _canvas == null) return;
             Camera cam = _canvas.renderMode == RenderMode.ScreenSpaceOverlay ? null : _canvas.worldCamera;
             var corners = new Vector3[4];
-            refRT.GetWorldCorners(corners); // 1 = top-left
+            _refRT.GetWorldCorners(corners); // 1 = top-left
             Vector2 topLeft;
             if (!RectTransformUtility.ScreenPointToLocalPointInRectangle(
                     _canvasRT, new Vector2(corners[1].x, corners[1].y), cam, out topLeft)) return;
             _rt.anchoredPosition = new Vector2(topLeft.x - 6f - _rt.sizeDelta.x, topLeft.y);
+            PositionPanel();
+        }
+
+        void PositionPanel()
+        {
+            if (_panelGO == null || _rt == null) return;
+            var corners = new Vector3[4];
+            _rt.GetWorldCorners(corners); // 3 = bottom-right
+            _panelGO.transform.position = corners[3];
+            ((RectTransform)_panelGO.transform).anchoredPosition += new Vector2(0f, -4f);
         }
 
         /// <summary>Chain to the left of whichever known mod button is present (leftmost wins).</summary>
@@ -148,6 +157,7 @@ namespace SolarExpanseCargoTemplates.UI
         {
             if (_canvas == null) return null;
             RectTransform best = null;
+            float bestX = float.MaxValue;
             foreach (RectTransform rt in _canvas.GetComponentsInChildren<RectTransform>(true))
             {
                 if (rt == _rt) continue;
@@ -158,7 +168,10 @@ namespace SolarExpanseCargoTemplates.UI
                      n.Equals("modFleetTrackerButton", StringComparison.OrdinalIgnoreCase)) &&
                     rt.GetComponent<Image>() != null)
                 {
-                    if (best == null || rt.position.x < best.position.x) best = rt;
+                    // Ignore buttons still parked at their offscreen staging position (-9999).
+                    var pos = rt.anchoredPosition;
+                    if (pos.x < -4000f || pos.y < -4000f) continue;
+                    if (best == null || pos.x < bestX) { best = rt; bestX = pos.x; }
                 }
             }
             return best;
@@ -204,10 +217,7 @@ namespace SolarExpanseCargoTemplates.UI
             RebuildContent();
 
             // Place under the button, right-aligned to it.
-            var corners = new Vector3[4];
-            _rt.GetWorldCorners(corners); // 3 = bottom-right
-            _panelGO.transform.position = corners[3];
-            panelRT.anchoredPosition += new Vector2(0f, -4f);
+            PositionPanel();
         }
 
         static string NextName(List<CargoTemplate> existing)
