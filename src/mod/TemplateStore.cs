@@ -2,11 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using BepInEx;
-using UnityEngine;
 
 namespace SolarExpanseCargoTemplates
 {
-    [Serializable]
     public class TemplateItem
     {
         // ResourceDefinition.ID, e.g. "id_resource_metal" — the game's stable save identifier.
@@ -14,17 +12,10 @@ namespace SolarExpanseCargoTemplates
         public double mass;
     }
 
-    [Serializable]
     public class CargoTemplate
     {
         public string name;
         public List<TemplateItem> items = new List<TemplateItem>();
-    }
-
-    [Serializable]
-    public class TemplateFile
-    {
-        public List<CargoTemplate> templates = new List<CargoTemplate>();
     }
 
     /// <summary>Global (cross-save) template persistence in BepInEx/config.</summary>
@@ -37,10 +28,7 @@ namespace SolarExpanseCargoTemplates
             try
             {
                 if (File.Exists(PathToFile))
-                {
-                    var file = JsonUtility.FromJson<TemplateFile>(File.ReadAllText(PathToFile));
-                    if (file != null && file.templates != null) return file.templates;
-                }
+                    return MiniJson.Parse(File.ReadAllText(PathToFile));
             }
             catch (Exception e)
             {
@@ -53,8 +41,7 @@ namespace SolarExpanseCargoTemplates
         {
             try
             {
-                var file = new TemplateFile { templates = templates };
-                File.WriteAllText(PathToFile, JsonUtility.ToJson(file, prettyPrint: true));
+                File.WriteAllText(PathToFile, MiniJson.Write(templates));
             }
             catch (Exception e)
             {

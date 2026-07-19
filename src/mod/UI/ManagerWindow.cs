@@ -128,19 +128,6 @@ namespace SolarExpanseCargoTemplates.UI
             _spawnTime = Time.unscaledTime;
         }
 
-        // Click probe: while the panel is open, log what the UI raycast hits — if some game
-        // window still covers our panel, its name shows up here.
-        void Update()
-        {
-            if (_panelGO == null || !Input.GetMouseButtonDown(0)) return;
-            var es = EventSystem.current;
-            if (es == null) return;
-            var ped = new PointerEventData(es) { position = Input.mousePosition };
-            var results = new List<RaycastResult>();
-            es.RaycastAll(ped, results);
-            for (int i = 0; i < results.Count && i < 3; i++)
-                Plugin.Log.LogInfo($"[CT] click hit {i}: {results[i].gameObject.name} (canvas {results[i].gameObject.GetComponentInParent<Canvas>()?.name})");
-        }
 
         void LateUpdate()
         {
@@ -225,7 +212,6 @@ namespace SolarExpanseCargoTemplates.UI
             if (!RectTransformUtility.ScreenPointToLocalPointInRectangle(_canvasRT, _dragStartScreen, cam, out start)) return;
             _rt.anchoredPosition = _dragStartAnchored + (cur - start);
             Clamp();
-            PositionPanel();
         }
 
         public void OnEndDrag(PointerEventData e) => StoreNormalizedPos();
@@ -270,19 +256,16 @@ namespace SolarExpanseCargoTemplates.UI
             _pickingForIndex = -1;
         }
 
-        /// <summary>Left-aligned under the button (clamped so it never leaves the screen).</summary>
+        /// <summary>
+        /// Fixed upper-mid-left placement. (World-corner→local conversion of the button proved
+        /// unreliable across canvas render modes — the panel ended up at the bottom of the screen.)
+        /// </summary>
         void PositionPanel()
         {
-            if (_panelGO == null || _rt == null || _rootRT == null) return;
-            var corners = new Vector3[4];
-            _rt.GetWorldCorners(corners); // 0 = bottom-left
-            Vector2 local;
-            if (!RectTransformUtility.ScreenPointToLocalPointInRectangle(
-                    _rootRT, new Vector2(corners[0].x, corners[0].y), Cam(), out local)) return;
-            local.y -= 4f;
+            if (_panelGO == null || _rootRT == null) return;
             Rect cr = _rootRT.rect;
-            local.x = Mathf.Clamp(local.x, cr.xMin, cr.xMax - PanelWidth);
-            ((RectTransform)_panelGO.transform).anchoredPosition = local;
+            ((RectTransform)_panelGO.transform).anchoredPosition =
+                new Vector2(cr.xMin + cr.width * 0.15f, cr.yMax - 60f);
         }
 
         void BuildPanel()
