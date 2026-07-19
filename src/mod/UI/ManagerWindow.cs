@@ -120,6 +120,7 @@ namespace SolarExpanseCargoTemplates.UI
         int _pickingForIndex = -1;     // template index whose add-picker is open
         bool _pickingBuildings;        // false = resource picker, true = building-cost picker
         string _searchQuery = "";      // live filter for the pickers
+        Transform _pickerList;         // container for picker rows (cleared on filter change)
 
         void Awake()
         {
@@ -223,6 +224,7 @@ namespace SolarExpanseCargoTemplates.UI
         {
             if (_panelGO != null) { Destroy(_panelGO); _panelGO = null; }
             _scrollContent = null;
+            _pickerList = null;
             _pickingForIndex = -1;
             _pickingBuildings = false;
         }
@@ -283,6 +285,7 @@ namespace SolarExpanseCargoTemplates.UI
         {
             if (_scrollContent == null) return;
             UIKit.ClearChildren(_scrollContent);
+            _pickerList = null;
 
             if (_pickingForIndex >= 0) { BuildPicker(); return; }
 
@@ -382,15 +385,26 @@ namespace SolarExpanseCargoTemplates.UI
                 PopulatePickerList();
             });
 
+            // Dedicated container for the rows: sibling indices are unreliable during a rebuild
+            // (destroyed children linger until end of frame), so filtering clears ONLY this.
+            var listGO = new GameObject("PickerList", typeof(RectTransform));
+            listGO.transform.SetParent(_scrollContent, false);
+            var listVlg = listGO.AddComponent<VerticalLayoutGroup>();
+            listVlg.spacing = 4f;
+            listVlg.childForceExpandWidth = true;
+            listVlg.childForceExpandHeight = false;
+            listVlg.childControlWidth = true;
+            listVlg.childControlHeight = true;
+            _pickerList = listGO.transform;
+
             PopulatePickerList();
         }
 
-        /// <summary>(Re)build everything below the picker's search row.</summary>
+        /// <summary>(Re)build the picker rows inside their container.</summary>
         void PopulatePickerList()
         {
-            if (_scrollContent == null || _scrollContent.childCount == 0) return;
-            for (int i = _scrollContent.childCount - 1; i >= 1; i--)
-                Destroy(_scrollContent.GetChild(i).gameObject);
+            if (_pickerList == null) return;
+            UIKit.ClearChildren(_pickerList);
 
             string q = (_searchQuery ?? "").Trim().ToLowerInvariant();
             bool Matches(string name) => q.Length == 0 || name.ToLowerInvariant().Contains(q);
@@ -406,7 +420,7 @@ namespace SolarExpanseCargoTemplates.UI
                     if (!Matches(name)) continue;
                     shown++;
                     string label = $"{name}  <color=#8A8A8A>{TemplateService.SummarizePrice(captured)}</color>";
-                    UIKit.MakeIconButton(_scrollContent, Font, captured.Sprite, label, () =>
+                    UIKit.MakeIconButton(_pickerList, Font, captured.Sprite, label, () =>
                     {
                         var list = TemplateStore.Load();
                         if (_pickingForIndex >= 0 && _pickingForIndex < list.Count)
@@ -420,7 +434,7 @@ namespace SolarExpanseCargoTemplates.UI
                     });
                 }
                 if (shown == 0)
-                    UIKit.MakeLabel(_scrollContent, Font, "No matching buildings.", muted: true);
+                    UIKit.MakeLabel(_pickerList, Font, "No matching buildings.", muted: true);
             }
             else
             {
@@ -432,7 +446,7 @@ namespace SolarExpanseCargoTemplates.UI
                     string name = TemplateService.ResourceName(id);
                     if (!Matches(name)) continue;
                     shown++;
-                    UIKit.MakeButton(_scrollContent, Font, TemplateService.ResourceLabel(id), () =>
+                    UIKit.MakeButton(_pickerList, Font, TemplateService.ResourceLabel(id), () =>
                     {
                         var list = TemplateStore.Load();
                         if (_pickingForIndex >= 0 && _pickingForIndex < list.Count)
@@ -445,7 +459,7 @@ namespace SolarExpanseCargoTemplates.UI
                     }, expandWidth: true, height: 26f, alignLeft: true);
                 }
                 if (shown == 0)
-                    UIKit.MakeLabel(_scrollContent, Font, "No matching resources.", muted: true);
+                    UIKit.MakeLabel(_pickerList, Font, "No matching resources.", muted: true);
             }
         }
     }
