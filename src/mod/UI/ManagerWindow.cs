@@ -379,10 +379,7 @@ namespace SolarExpanseCargoTemplates.UI
 
                 if (t.collapsed)
                 {
-                    // Folded: hide item rows and the add buttons; just a compact summary line.
-                    UIKit.MakeLabel(_scrollContent, Font,
-                        $"    {t.items.Count} resource{(t.items.Count == 1 ? "" : "s")}", 13f, muted: true)
-                        .GetComponent<LayoutElement>().minHeight = 20f;
+                    // Folded: just the header row, nothing else.
                     UIKit.MakeLabel(_scrollContent, Font, "", 6f).GetComponent<LayoutElement>().minHeight = 8f;
                     continue;
                 }
