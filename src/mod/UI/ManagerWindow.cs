@@ -390,7 +390,7 @@ namespace SolarExpanseCargoTemplates.UI
                     var item = t.items[j];
                     var row = UIKit.MakeRow(_scrollContent);
                     string itemLabel = item.module
-                        ? "    " + TemplateService.ResourceName(item.id) + " <color=#8A8A8A>(module)</color>"
+                        ? "    " + TemplateService.ModuleLabel(item.id)
                         : "    " + TemplateService.ResourceLabel(item.id);
                     UIKit.MakeLabel(row.transform, Font, itemLabel, expandWidth: true);
                     UIKit.MakeInput(row.transform, Font,

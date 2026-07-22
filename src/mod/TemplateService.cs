@@ -63,6 +63,21 @@ namespace SolarExpanseCargoTemplates
 
         static bool ShowUnresearched => Plugin.CfgShowUnresearched != null && Plugin.CfgShowUnresearched.Value;
 
+        /// <summary>"[icon] Name" for a module/facility descriptor via TMP sprite-name markup.</summary>
+        public static string ModuleLabel(string id)
+        {
+            string name = ResourceName(id);
+            try
+            {
+                var all = SerializedMonoBehaviourSingleton<AllScriptableObjectManager>.Instance;
+                var desc = all != null && all.AllFacility != null ? all.AllFacility.GetByID(id) : null;
+                if (desc != null && desc.Sprite != null)
+                    return $"<sprite name=\"{desc.SpriteId}\" color=white> {name}";
+            }
+            catch { }
+            return name;
+        }
+
         public static bool IsBuildingUnlocked(Data.ScriptableObject.FacilityBaseDescriptor f)
         {
             var player = Player;
