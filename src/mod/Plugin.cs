@@ -4,7 +4,7 @@ using HarmonyLib;
 
 namespace SolarExpanseCargoTemplates
 {
-    [BepInPlugin("com.djben.solar-expanse-cargo-templates", "Solar Expanse Cargo Templates", "1.0.0")]
+    [BepInPlugin("com.djben.solar-expanse-cargo-templates", "Solar Expanse Cargo Templates", "1.1.0")]
     public class Plugin : BaseUnityPlugin
     {
         internal static BepInEx.Logging.ManualLogSource Log { get; private set; }

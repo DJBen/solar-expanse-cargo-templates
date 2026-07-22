@@ -23,13 +23,20 @@ A draggable **CARGO TEMPLATES** button appears near the top-left of the screen.
 Click it to open the template editor:
 
 - **+ NEW** creates a template; rename it inline (the focused field highlights
-  so you can tell what you're editing).
-- **+ ADD RESOURCE** opens a searchable picker of every cargo-able resource
+  so you can tell what you're editing). The chevron folds a template down to
+  its header row.
+- **+ RESOURCE** opens a searchable picker of every cargo-able resource
   (icon + name); each added item has an editable tonnage.
-- **+ FROM BUILDING COST** opens a searchable picker of every building you have
-  unlocked (icon, name, and its cost as icon + tonnage). Choosing one merges
-  the building's construction cost into the template, summing amounts for
+- **+ MODULE** opens a searchable picker of space module types (crew capacity
+  noted); each added item has an editable count.
+- **+ BUILDING** opens a searchable picker of every building you have unlocked
+  (icon, name, and its cost as icon + tonnage). Choosing one merges the
+  building's construction cost into the template, summing amounts for
   resources already present.
+- **+ SC & LV** does the same for the construction cost of any unlocked
+  spacecraft or launch vehicle.
+- **OPTIONS → Show Unresearched** additionally lists research-locked modules,
+  buildings and craft (marked *(unresearched)*), for planning ahead.
 - **✕** removes an item or a whole template. Every change saves immediately.
 
 ### TEMPLATES dropdown (Plan Mission → Cargo)
@@ -39,16 +46,20 @@ dropdown lists your templates, one block per template:
 
 - First line: template name, with a **× multiplier** input beside it
   (default 1) to apply the template N times over.
-- Below: the resource list as icon + amount (`100t`, `15kt`, `1.5Mt`),
-  wrapping onto as many lines as needed.
-- Amounts the origin can't fully cover are shown in **red**, re-checked live
+- Below: the contents as icon + amount (`100t`, `15kt`, `1.5Mt`) and module
+  counts (`4× Crew Compartment`), wrapping onto as many lines as needed.
+- Anything the origin can't fully cover is shown in **red**, re-checked live
   as you type in the multiplier.
-- Click the block to append those resources to the current cargo. Amounts are
-  clamped to what the origin actually has and the craft's remaining capacity.
+- Click the block to append the template to the current cargo:
+  - Resource amounts are clamped to what the origin actually has and the
+    craft's remaining capacity; resources already in the cargo are **merged**
+    (summed), never duplicated or overwritten.
+  - Modules are pulled from the origin's actual stock, up to what's available.
+  - **Crew modules** load a full crew by default; if the origin doesn't have
+    enough people left, the last module takes a partial crew instead.
 
 ### Notes
 
-- **Resources only** — modules are intentionally not part of templates.
 - The dropdown does **not** appear in cyclical-mission planning, only the
   regular Plan Mission window.
 - Templates are global (not per-save) and persist in
