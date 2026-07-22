@@ -379,8 +379,7 @@ namespace SolarExpanseCargoTemplates.UI
 
                 if (t.collapsed)
                 {
-                    // Folded: just the header row, nothing else.
-                    UIKit.MakeLabel(_scrollContent, Font, "", 6f).GetComponent<LayoutElement>().minHeight = 8f;
+                    // Folded: just the header row, snug against the next template.
                     continue;
                 }
 

@@ -97,46 +97,48 @@ namespace SolarExpanseCargoTemplates
             return result;
         }
 
-        /// <summary>
-        /// Live module instances of the given descriptor id at the mission origin that are not
-        /// already assigned to the current cargo.
-        /// </summary>
-        public static List<SpaceModule> AvailableModuleInstances(PMTabCargo tab, string descriptorId)
+        /// <summary>A live module at the origin with how many of its stack are still available.</summary>
+        public class ModuleStack
         {
-            var result = new List<SpaceModule>();
+            public SpaceModule sm;
+            public int available;
+        }
+
+        /// <summary>
+        /// Module stacks of the given descriptor id at the mission origin. A SpaceModule is a
+        /// STACK (Quantity), not a single unit — the game's GetAvailableCountOffSpaceModule
+        /// (Quantity − MinEnabledQuantity − rows already selecting it) gives what's usable.
+        /// </summary>
+        public static List<ModuleStack> AvailableModuleStacks(PMTabCargo tab, string descriptorId)
+        {
+            var result = new List<ModuleStack>();
             try
             {
                 var p = tab.PlanMissionWindow.PMMissionParameter;
                 var player = Player;
                 if (p.Start == null || player == null) return result;
 
-                var used = new HashSet<SpaceModule>();
-                var cargoAll = GetCargoAll(tab);
-                if (cargoAll != null)
-                {
-                    void CollectUsed(List<Cargo> list)
-                    {
-                        if (list == null) return;
-                        foreach (var c in list)
-                            if (c != null && c.SourceModule != null) used.Add(c.SourceModule);
-                    }
-                    CollectUsed(cargoAll.listCargo);
-                    CollectUsed(cargoAll.listCargoToOrbit);
-                    CollectUsed(cargoAll.listCargoGravityAssists);
-                }
-
                 foreach (var sm in p.Start.GetAvailableModulesForCargo(player, null))
                 {
-                    if (sm == null || used.Contains(sm)) continue;
-                    if (sm.facilityDescriptor != null && sm.facilityDescriptor.ID == descriptorId)
-                        result.Add(sm);
+                    if (sm == null || sm.facilityDescriptor == null || sm.facilityDescriptor.ID != descriptorId)
+                        continue;
+                    int available = (int)p.Start.GetAvailableCountOffSpaceModule(sm);
+                    if (available > 0)
+                        result.Add(new ModuleStack { sm = sm, available = available });
                 }
             }
             catch (Exception e)
             {
-                Plugin.Log.LogError($"AvailableModuleInstances failed: {e}");
+                Plugin.Log.LogError($"AvailableModuleStacks failed: {e}");
             }
             return result;
+        }
+
+        public static int AvailableModuleCount(PMTabCargo tab, string descriptorId)
+        {
+            int total = 0;
+            foreach (var stack in AvailableModuleStacks(tab, descriptorId)) total += stack.available;
+            return total;
         }
 
         /// <summary>Unlocked spacecraft + launch vehicles that have a resource cost.</summary>
@@ -275,7 +277,7 @@ namespace SolarExpanseCargoTemplates
                 if (item.module)
                 {
                     int needed = (int)Math.Round(item.mass) * multiplier;
-                    int avail = AvailableModuleInstances(tab, item.id).Count;
+                    int avail = AvailableModuleCount(tab, item.id);
                     string text = $"{needed}× {ResourceName(item.id)}";
                     parts.Add(avail < needed ? $"<color={RedHex}>{text}</color>" : text);
                     continue;
@@ -378,28 +380,38 @@ namespace SolarExpanseCargoTemplates
         {
             int wanted = (int)Math.Round(item.mass) * multiplier;
             if (wanted <= 0) return;
-            var instances = AvailableModuleInstances(tab, item.id);
-            if (instances.Count < wanted)
-                Plugin.Log.LogInfo($"Template wants {wanted}x {item.id}, only {instances.Count} available at origin");
+            var stacks = AvailableModuleStacks(tab, item.id);
 
             var origin = tab.PlanMissionWindow.PMMissionParameter.Start;
             var player = Player;
 
-            for (int i = 0; i < wanted && i < instances.Count; i++)
+            int remaining = wanted;
+            foreach (var stack in stacks)
             {
-                int before = cargoAll.listCargo.Count;
-                tab.AddCargo(instances[i], setDataResourcesListInvoke: false);
-                if (cargoAll.listCargo.Count <= before) continue;
-
-                Cargo added = cargoAll.listCargo[cargoAll.listCargo.Count - 1];
-                if (added.crewValue > 0 && origin != null && player != null)
+                // The stack's DropDowSelectsCount only updates when rows rebind (end of Apply),
+                // so decrement a local budget while adding from the same stack.
+                int budget = stack.available;
+                while (remaining > 0 && budget > 0)
                 {
-                    int availablePeople = origin.CurrentCrewAvailableToFly(player);
-                    int totalCrew = cargoAll.HowMuchCrew();
-                    if (totalCrew > availablePeople)
-                        added.crewValue = Math.Max(added.crewValue - (totalCrew - availablePeople), 0);
+                    int before = cargoAll.listCargo.Count;
+                    tab.AddCargo(stack.sm, setDataResourcesListInvoke: false);
+                    if (cargoAll.listCargo.Count <= before) break; // game refused — stop this stack
+
+                    remaining--;
+                    budget--;
+                    Cargo added = cargoAll.listCargo[cargoAll.listCargo.Count - 1];
+                    if (added.crewValue > 0 && origin != null && player != null)
+                    {
+                        int availablePeople = origin.CurrentCrewAvailableToFly(player);
+                        int totalCrew = cargoAll.HowMuchCrew();
+                        if (totalCrew > availablePeople)
+                            added.crewValue = Math.Max(added.crewValue - (totalCrew - availablePeople), 0);
+                    }
                 }
+                if (remaining <= 0) break;
             }
+            if (remaining > 0)
+                Plugin.Log.LogInfo($"Template wanted {wanted}x {item.id}; origin could only supply {wanted - remaining}");
         }
     }
 }
