@@ -69,6 +69,76 @@ namespace SolarExpanseCargoTemplates
             return player == null || player.IsUnlockFacility(f);
         }
 
+        /// <summary>A space module type that can be part of a template.</summary>
+        public class ModuleOption
+        {
+            public string id;
+            public UnityEngine.Sprite sprite;
+            public bool locked;
+            public int crewCapacity; // > 0 for crew-transport modules
+        }
+
+        /// <summary>Module types for the editor picker (unlocked, or all with ShowUnresearched).</summary>
+        public static List<ModuleOption> AvailableModuleTypes()
+        {
+            var result = new List<ModuleOption>();
+            var all = SerializedMonoBehaviourSingleton<AllScriptableObjectManager>.Instance;
+            if (all == null || all.AllFacility == null) return result;
+            var player = Player;
+            foreach (var f in all.AllFacility.ListNotEmpty)
+            {
+                if (!(f is SpaceModuleDescriptor smd)) continue;
+                bool locked = player != null && !player.IsUnlockFacility(smd);
+                if (locked && !ShowUnresearched) continue;
+                int crew = smd.specialAbilityFacilityNew.HasFlag(ESpecialAbilityFacilityNew.CrewTransport)
+                    ? (int)smd.specialAbilityParameter : 0;
+                result.Add(new ModuleOption { id = smd.ID, sprite = smd.Sprite, locked = locked, crewCapacity = crew });
+            }
+            return result;
+        }
+
+        /// <summary>
+        /// Live module instances of the given descriptor id at the mission origin that are not
+        /// already assigned to the current cargo.
+        /// </summary>
+        public static List<SpaceModule> AvailableModuleInstances(PMTabCargo tab, string descriptorId)
+        {
+            var result = new List<SpaceModule>();
+            try
+            {
+                var p = tab.PlanMissionWindow.PMMissionParameter;
+                var player = Player;
+                if (p.Start == null || player == null) return result;
+
+                var used = new HashSet<SpaceModule>();
+                var cargoAll = GetCargoAll(tab);
+                if (cargoAll != null)
+                {
+                    void CollectUsed(List<Cargo> list)
+                    {
+                        if (list == null) return;
+                        foreach (var c in list)
+                            if (c != null && c.SourceModule != null) used.Add(c.SourceModule);
+                    }
+                    CollectUsed(cargoAll.listCargo);
+                    CollectUsed(cargoAll.listCargoToOrbit);
+                    CollectUsed(cargoAll.listCargoGravityAssists);
+                }
+
+                foreach (var sm in p.Start.GetAvailableModulesForCargo(player, null))
+                {
+                    if (sm == null || used.Contains(sm)) continue;
+                    if (sm.facilityDescriptor != null && sm.facilityDescriptor.ID == descriptorId)
+                        result.Add(sm);
+                }
+            }
+            catch (Exception e)
+            {
+                Plugin.Log.LogError($"AvailableModuleInstances failed: {e}");
+            }
+            return result;
+        }
+
         /// <summary>Unlocked spacecraft + launch vehicles that have a resource cost.</summary>
         public static List<CraftCost> AvailableCraft()
         {
@@ -202,12 +272,20 @@ namespace SolarExpanseCargoTemplates
             var parts = new List<string>();
             foreach (var item in t.items)
             {
-                double needed = item.mass * multiplier;
+                if (item.module)
+                {
+                    int needed = (int)Math.Round(item.mass) * multiplier;
+                    int avail = AvailableModuleInstances(tab, item.id).Count;
+                    string text = $"{needed}× {ResourceName(item.id)}";
+                    parts.Add(avail < needed ? $"<color={RedHex}>{text}</color>" : text);
+                    continue;
+                }
+                double neededMass = item.mass * multiplier;
                 ResourceDefinition rd = GetResource(item.id);
-                bool short_ = rd == null || AvailableAtOrigin(tab, rd) + 1e-9 < needed;
+                bool short_ = rd == null || AvailableAtOrigin(tab, rd) + 1e-9 < neededMass;
                 string icon;
                 try { icon = rd != null ? rd.IconString + " " : ""; } catch { icon = ""; }
-                string amount = FormatMass(needed);
+                string amount = FormatMass(neededMass);
                 // The sprite ignores the color tag; the amount text carries the red signal.
                 parts.Add(icon + (short_ ? $"<color={RedHex}>{amount}</color>" : amount));
             }
@@ -235,6 +313,12 @@ namespace SolarExpanseCargoTemplates
 
             foreach (var item in template.items)
             {
+                if (item.module)
+                {
+                    try { ApplyModuleItem(tab, cargoAll, item, multiplier); }
+                    catch (Exception e) { Plugin.Log.LogError($"Failed to add module {item.id}: {e}"); }
+                    continue;
+                }
                 ResourceDefinition rd = GetResource(item.id);
                 if (rd == null)
                 {
@@ -282,6 +366,40 @@ namespace SolarExpanseCargoTemplates
                 }
             }
             tab.SetDataResourcesList();
+        }
+
+        /// <summary>
+        /// Add up to count×multiplier instances of a module type from the origin. Crew modules get
+        /// full crew by default (the game's AddCargo does that); if the origin doesn't have enough
+        /// people left, the crew value is trimmed down — partial crew — mirroring the game's own
+        /// SliderCrewChange clamping.
+        /// </summary>
+        static void ApplyModuleItem(PMTabCargo tab, CargoAll cargoAll, TemplateItem item, int multiplier)
+        {
+            int wanted = (int)Math.Round(item.mass) * multiplier;
+            if (wanted <= 0) return;
+            var instances = AvailableModuleInstances(tab, item.id);
+            if (instances.Count < wanted)
+                Plugin.Log.LogInfo($"Template wants {wanted}x {item.id}, only {instances.Count} available at origin");
+
+            var origin = tab.PlanMissionWindow.PMMissionParameter.Start;
+            var player = Player;
+
+            for (int i = 0; i < wanted && i < instances.Count; i++)
+            {
+                int before = cargoAll.listCargo.Count;
+                tab.AddCargo(instances[i], setDataResourcesListInvoke: false);
+                if (cargoAll.listCargo.Count <= before) continue;
+
+                Cargo added = cargoAll.listCargo[cargoAll.listCargo.Count - 1];
+                if (added.crewValue > 0 && origin != null && player != null)
+                {
+                    int availablePeople = origin.CurrentCrewAvailableToFly(player);
+                    int totalCrew = cargoAll.HowMuchCrew();
+                    if (totalCrew > availablePeople)
+                        added.crewValue = Math.Max(added.crewValue - (totalCrew - availablePeople), 0);
+                }
+            }
         }
     }
 }

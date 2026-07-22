@@ -118,7 +118,7 @@ namespace SolarExpanseCargoTemplates.UI
         GameObject _panelGO;
         GameObject _optionsGO;
         Transform _scrollContent;
-        enum PickerKind { Resources, Buildings, Craft }
+        enum PickerKind { Resources, Modules, Buildings, Craft }
 
         int _pickingForIndex = -1;     // template index whose add-picker is open
         PickerKind _pickerKind;        // which list the open picker shows
@@ -390,11 +390,14 @@ namespace SolarExpanseCargoTemplates.UI
                     int itemIndex = j;
                     var item = t.items[j];
                     var row = UIKit.MakeRow(_scrollContent);
-                    UIKit.MakeLabel(row.transform, Font, "    " + TemplateService.ResourceLabel(item.id),
-                        expandWidth: true);
+                    string itemLabel = item.module
+                        ? "    " + TemplateService.ResourceName(item.id) + " <color=#8A8A8A>(module)</color>"
+                        : "    " + TemplateService.ResourceLabel(item.id);
+                    UIKit.MakeLabel(row.transform, Font, itemLabel, expandWidth: true);
                     UIKit.MakeInput(row.transform, Font,
-                        item.mass.ToString("0.##", CultureInfo.InvariantCulture),
-                        TMP_InputField.ContentType.DecimalNumber, 90f,
+                        item.module ? ((int)item.mass).ToString() : item.mass.ToString("0.##", CultureInfo.InvariantCulture),
+                        item.module ? TMP_InputField.ContentType.IntegerNumber : TMP_InputField.ContentType.DecimalNumber,
+                        90f,
                         v =>
                         {
                             if (!double.TryParse(v, NumberStyles.Any, CultureInfo.InvariantCulture, out double mass))
@@ -403,7 +406,7 @@ namespace SolarExpanseCargoTemplates.UI
                             if (templateIndex < list.Count && itemIndex < list[templateIndex].items.Count)
                             { list[templateIndex].items[itemIndex].mass = Math.Max(0, mass); TemplateStore.Save(list); }
                         });
-                    UIKit.MakeLabel(row.transform, Font, "t", fixedWidth: 14f, muted: true);
+                    UIKit.MakeLabel(row.transform, Font, item.module ? "×" : "t", fixedWidth: 14f, muted: true);
                     UIKit.MakeCrossButton(row.transform, () =>
                     {
                         var list = TemplateStore.Load();
@@ -426,8 +429,9 @@ namespace SolarExpanseCargoTemplates.UI
                     }, expandWidth: true, height: 26f, bgColor: new Color(0.10f, 0.14f, 0.20f, 0.9f));
                 }
                 AddPickerButton("+ RESOURCE", PickerKind.Resources);
-                AddPickerButton("+ BUILDING COST", PickerKind.Buildings);
-                AddPickerButton("+ SC & LV COST", PickerKind.Craft);
+                AddPickerButton("+ MODULE", PickerKind.Modules);
+                AddPickerButton("+ BUILDING", PickerKind.Buildings);
+                AddPickerButton("+ SC & LV", PickerKind.Craft);
 
                 // Spacer between templates
                 UIKit.MakeLabel(_scrollContent, Font, "", 6f).GetComponent<LayoutElement>().minHeight = 8f;
@@ -507,6 +511,38 @@ namespace SolarExpanseCargoTemplates.UI
                 }
                 if (shown == 0)
                     UIKit.MakeLabel(_pickerList, Font, "No matching buildings.", muted: true);
+            }
+            else if (_pickerKind == PickerKind.Modules)
+            {
+                var modules = TemplateService.AvailableModuleTypes();
+                int shown = 0;
+                foreach (var m in modules)
+                {
+                    var captured = m;
+                    string name = TemplateService.ResourceName(captured.id);
+                    if (!Matches(name)) continue;
+                    shown++;
+                    string crewNote = captured.crewCapacity > 0
+                        ? $" <color=#8A8A8A>crew {captured.crewCapacity}</color>" : "";
+                    string marker = captured.locked ? " <color=#C9A15A>(unresearched)</color>" : "";
+                    UIKit.MakeIconButton(_pickerList, Font, captured.sprite, $"{name}{marker}{crewNote}", () =>
+                    {
+                        var list = TemplateStore.Load();
+                        if (_pickingForIndex >= 0 && _pickingForIndex < list.Count)
+                        {
+                            var items = list[_pickingForIndex].items;
+                            var existing = items.Find(x => x.module && x.id == captured.id);
+                            if (existing != null) existing.mass += 1;
+                            else items.Add(new TemplateItem { id = captured.id, mass = 1, module = true });
+                            TemplateStore.Save(list);
+                        }
+                        _pickingForIndex = -1;
+                        _useSavedTemplateScroll = true;
+                        RebuildContent();
+                    });
+                }
+                if (shown == 0)
+                    UIKit.MakeLabel(_pickerList, Font, "No matching modules.", muted: true);
             }
             else if (_pickerKind == PickerKind.Craft)
             {

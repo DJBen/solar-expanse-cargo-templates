@@ -29,8 +29,9 @@ namespace SolarExpanseCargoTemplates
                     var item = t.items[j];
                     if (j > 0) sb.Append(',');
                     sb.Append("\n      { \"id\": ").Append(Quote(item.id))
-                      .Append(", \"mass\": ").Append(item.mass.ToString("0.##", CultureInfo.InvariantCulture))
-                      .Append(" }");
+                      .Append(", \"mass\": ").Append(item.mass.ToString("0.##", CultureInfo.InvariantCulture));
+                    if (item.module) sb.Append(", \"module\": true");
+                    sb.Append(" }");
                 }
                 if (t.items.Count > 0) sb.Append("\n    ");
                 sb.Append("] }");
@@ -80,8 +81,9 @@ namespace SolarExpanseCargoTemplates
                         if (!(iVal is Dictionary<string, object> iObj)) continue;
                         string id = iObj.TryGetValue("id", out object idVal) ? idVal as string : null;
                         double mass = iObj.TryGetValue("mass", out object mVal) && mVal is double d ? d : 0;
+                        bool module = iObj.TryGetValue("module", out object modVal) && modVal is bool mb && mb;
                         if (!string.IsNullOrEmpty(id))
-                            template.items.Add(new TemplateItem { id = id, mass = mass });
+                            template.items.Add(new TemplateItem { id = id, mass = mass, module = module });
                     }
                 }
                 result.Add(template);

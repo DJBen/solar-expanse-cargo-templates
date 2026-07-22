@@ -7,9 +7,12 @@ namespace SolarExpanseCargoTemplates
 {
     public class TemplateItem
     {
-        // ResourceDefinition.ID, e.g. "id_resource_metal" — the game's stable save identifier.
+        // ResourceDefinition.ID (e.g. "id_resource_metal") or, for modules, the
+        // SpaceModuleDescriptor's ID — the game's stable save identifiers.
         public string id;
+        // Tons for resources; module COUNT for module items.
         public double mass;
+        public bool module;
     }
 
     public class CargoTemplate
