@@ -280,17 +280,17 @@ namespace SolarExpanseCargoTemplates
                     int avail = AvailableModuleCount(tab, item.id);
                     // Facility icons live in the TMP sprite asset under the sprite's name
                     // (the game's own spriteTextStart5 markup); fall back to the name if missing.
-                    string icon = "";
+                    string modIcon = "";
                     var all = SerializedMonoBehaviourSingleton<AllScriptableObjectManager>.Instance;
                     var desc = all != null && all.AllFacility != null ? all.AllFacility.GetByID(item.id) : null;
                     try
                     {
                         if (desc != null && desc.Sprite != null)
-                            icon = $"<sprite name=\"{desc.SpriteId}\" color=white> ";
+                            modIcon = $"<sprite name=\"{desc.SpriteId}\" color=white> ";
                     }
-                    catch { icon = ""; }
-                    string text = icon != ""
-                        ? $"{icon}{(avail < needed ? $"<color={RedHex}>{needed}×</color>" : $"{needed}×")}"
+                    catch { modIcon = ""; }
+                    string text = modIcon != ""
+                        ? $"{modIcon}{(avail < needed ? $"<color={RedHex}>{needed}×</color>" : $"{needed}×")}"
                         : (avail < needed
                             ? $"<color={RedHex}>{needed}× {ResourceName(item.id)}</color>"
                             : $"{needed}× {ResourceName(item.id)}");
